@@ -21,7 +21,7 @@ export default function TabsLayout() {
         name="admin"
         options={{
           title: t('GSCLIMBING.PROJECTS'),
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <MaterialCommunityIcons
               name="view-dashboard"
               size={size}
@@ -34,7 +34,7 @@ export default function TabsLayout() {
         name="tech"
         options={{
           title: t('GSCLIMBING.REPORTS'),
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <MaterialCommunityIcons
               name="file-document-multiple"
               size={size}

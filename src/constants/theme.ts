@@ -218,19 +218,3 @@ export const opacity = {
   active: 1,
 };
 
-// Export tudo junto
-export default {
-  colors,
-  theme,
-  darkTheme,
-  spacing,
-  fontSize,
-  fontWeight,
-  shadows,
-  borderRadius,
-  iconSize,
-  layout,
-  duration,
-  zIndex,
-  opacity,
-};

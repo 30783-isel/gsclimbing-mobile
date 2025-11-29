@@ -4,10 +4,10 @@
     "slug": "gsclimbing-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/search.png",
+    "icon": "./assets/images/search.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/search.png",
+      "image": "./assets/images/search.png",
       "resizeMode": "contain",
       "backgroundColor": "#670B25"
     },
@@ -25,7 +25,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/search.png",
+        "foregroundImage": "./assets/images/search.png",
         "backgroundColor": "#670B25"
       },
       "package": "com.gsclimbing.mobile",
@@ -37,7 +37,7 @@
       ]
     },
     "web": {
-      "favicon": "./assets/search.png"
+      "favicon": "./assets/images/search.png"
     },
     "plugins": [
       "expo-router",
