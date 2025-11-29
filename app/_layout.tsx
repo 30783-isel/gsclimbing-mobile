@@ -6,7 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import Toast from 'react-native-toast-message';
 import { useAuthStore } from '@/store/authStore';
 import { theme } from '@/constants/theme';
-import '@/i18n/config';
+import '../src/i18n/config';
 
 export default function RootLayout() {
   const { initializeAuth, isAuthenticated, isLoading } = useAuthStore();
