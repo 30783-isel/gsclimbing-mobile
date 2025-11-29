@@ -1,4 +1,4 @@
-const SERVER_IP = '192.168.1.100'; // ALTERE AQUI!
+const SERVER_IP = '192.168.1.130'; // ALTERE AQUI!
 const PORT = '8080';
 
 export const API_CONFIG = {

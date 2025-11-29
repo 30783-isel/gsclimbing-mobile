@@ -1,12 +1,10 @@
+// metro.config.js
 const { getDefaultConfig } = require('expo/metro-config');
-const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 
-config.resolver.extraNodeModules = {
-  '@': path.resolve(__dirname, 'src'),
-};
-
-config.watchFolders = [path.resolve(__dirname, 'src')];
+// Configurar extensões de plataforma
+config.resolver.sourceExts = ['jsx', 'js', 'ts', 'tsx', 'json'];
+config.resolver.platforms = ['ios', 'android', 'web'];
 
 module.exports = config;

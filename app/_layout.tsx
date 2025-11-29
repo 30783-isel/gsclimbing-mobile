@@ -4,6 +4,7 @@ import { PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import Toast from 'react-native-toast-message';
+import { Platform } from 'react-native';
 import { useAuthStore } from '@/store/authStore';
 import { theme } from '@/constants/theme';
 import '../src/i18n/config';
@@ -41,7 +42,7 @@ export default function RootLayout() {
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(tabs)" />
         </Stack>
-        <Toast />
+        {Platform.OS !== 'web' && <Toast />}
       </PaperProvider>
     </SafeAreaProvider>
   );
