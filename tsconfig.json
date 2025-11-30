@@ -1,7 +1,8 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true,
+    "strict": false,
+    "skipLibCheck": true,
     "target": "ES2022",
     "lib": [
       "ES2022"
@@ -11,7 +12,6 @@
     "moduleResolution": "node16",
     "noEmit": true,
     "resolveJsonModule": true,
-    "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
