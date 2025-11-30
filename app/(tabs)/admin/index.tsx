@@ -46,7 +46,7 @@ export default function AdminProjectsScreen() {
 
   const handleProjectPress = (project: Project) => {
     setSelectedProject(project);
-    router.push(`/projects/${project.idProject}`);
+    router.push(`/(tabs)/admin/project/${project.idProject}`);
   };
 
   const handleCreateProject = () => {
