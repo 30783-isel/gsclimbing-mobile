@@ -1,0 +1,21 @@
+Get-Process -Name node | Select-Object Id, ProcessName, StartTime
+Get-Process -Name node | Stop-Process -Force
+
+http://localhost:8081/app/_layout.bundle?platform=web&dev=true
+Procura no código que aparece por PaperProvider. Se encontrares, o bundle está desatualizado.
+
+
+-----------------------------------------------------
+5. Solução Drástica - Rebuild completo
+# Para TUDO
+Get-Process -Name node -ErrorAction SilentlyContinue | Stop-Process -Force
+
+# Remove node_modules COMPLETO (vai demorar)
+Remove-Item -Recurse -Force node_modules
+
+# Reinstala
+npm install
+
+# Inicia limpo
+npx expo start --clear
+----------------------------------------------------
