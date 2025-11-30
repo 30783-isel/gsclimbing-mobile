@@ -1,6 +1,6 @@
 ﻿import { Platform } from 'react-native';
 
-const SERVER_IP = '192.168.1.130';
+const SERVER_IP = '192.168.1.24';
 const PORT = '8080';
 
 const getBaseURL = (): string => {
