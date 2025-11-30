@@ -1,16 +1,15 @@
 import { useEffect } from 'react';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Slot, useRouter, useSegments } from 'expo-router';
 import { PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-//import Toast from 'react-native-toast-message';
-import { Platform } from 'react-native';
+import Toast from 'react-native-toast-message';
 import { useAuthStore } from '@/store/authStore';
 import { theme } from '@/constants/theme';
-import '../src/i18n/config';
+import '@/i18n/config';
 
 export default function RootLayout() {
-  const { initializeAuth, isAuthenticated, isLoading } = useAuthStore();
+  const { initializeAuth, isAuthenticated, isLoading, role } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
 
@@ -26,23 +25,25 @@ export default function RootLayout() {
     if (!isAuthenticated && !inAuthGroup) {
       router.replace('/(auth)/login');
     } else if (isAuthenticated && inAuthGroup) {
-      router.replace('/(tabs)/admin');
+      // Redirecionar baseado no role
+      if (role === 'ADMIN') {
+        router.replace('/(tabs)/admin');
+      } else {
+        router.replace('/(tabs)/tech');
+      }
     }
-  }, [isAuthenticated, isLoading, segments]);
+  }, [isAuthenticated, isLoading, segments, role]);
 
   if (isLoading) {
-    return null; // ou componente de loading
+    return null;
   }
 
   return (
     <SafeAreaProvider>
       <PaperProvider theme={theme}>
         <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(tabs)" />
-        </Stack>
-        {/* {Platform.OS !== 'web' && <Toast />} */}
+        <Slot />
+        <Toast />
       </PaperProvider>
     </SafeAreaProvider>
   );
