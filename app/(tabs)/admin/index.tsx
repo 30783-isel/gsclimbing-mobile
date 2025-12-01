@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProjects } from '@/hooks/useProjects';
 import { ProjectFormSheet } from '@/components/ProjectFormSheet';
 import { FiltersSheet } from '@/components/FiltersSheet';
+import { SyncStatus } from '@/components/SyncStatus';
 import { colors, spacing } from '@/constants/theme';
 import type { Project, ProjectFilters } from '@/types/project.types';
 
@@ -197,12 +198,15 @@ export default function AdminProjectsScreen() {
             Olá, {user?.username}! 👋
           </Text>
         </View>
-        <IconButton
-          icon="logout"
-          size={24}
-          iconColor={colors.primary}
-          onPress={handleLogout}
-        />
+        <View style={styles.headerRight}>
+          <SyncStatus />
+          <IconButton
+            icon="logout"
+            size={24}
+            iconColor={colors.primary}
+            onPress={handleLogout}
+          />
+        </View>
       </View>
 
       {/* Searchbar */}
@@ -344,6 +348,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.md,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   title: {
     color: colors.text,

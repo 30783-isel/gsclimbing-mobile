@@ -68,14 +68,25 @@ export interface CreateReportDTO {
  * Photo do relatório
  */
 export interface ReportPhoto {
-  id?: string;
+  id: string;
   reportId: string;
   uri: string;
   base64?: string;
   filename: string;
   type: string;
   size: number;
+  timestamp: number;
   uploadDate?: string;
   isUploaded: boolean;
   isOffline?: boolean;
+}
+
+/**
+ * Estado de upload
+ */
+export interface UploadProgress {
+  photoId: string;
+  progress: number;
+  isUploading: boolean;
+  error?: string;
 }
