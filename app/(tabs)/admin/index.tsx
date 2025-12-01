@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { useProjects } from '@/hooks/useProjects';
+import { ProjectFormSheet } from '@/components/ProjectFormSheet';
 import { colors, spacing } from '@/constants/theme';
 import type { Project } from '@/types/project.types';
 
@@ -19,10 +20,15 @@ export default function AdminProjectsScreen() {
     loadProjects,
     refreshProjects,
     setSelectedProject,
+    createProject,
+    editProject,
   } = useProjects();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const [sheetMode, setSheetMode] = useState<'create' | 'edit'>('create');
+  const [selectedForEdit, setSelectedForEdit] = useState<Project | null>(null);
 
   // Carregar projetos ao montar componente
   useEffect(() => {
@@ -50,7 +56,25 @@ export default function AdminProjectsScreen() {
   };
 
   const handleCreateProject = () => {
-    router.push('/projects/create');
+    setSheetMode('create');
+    setSelectedForEdit(null);
+    setSheetVisible(true);
+  };
+
+  const handleEditProject = (project: Project, event: any) => {
+    event?.stopPropagation();
+    setSheetMode('edit');
+    setSelectedForEdit(project);
+    setSheetVisible(true);
+  };
+
+  const handleFormSubmit = async (data: any) => {
+    if (sheetMode === 'create') {
+      await createProject(data);
+    } else if (selectedForEdit) {
+      await editProject(selectedForEdit.idProject, data);
+    }
+    await loadProjects();
   };
 
   const renderProjectCard = ({ item }: { item: Project }) => (
@@ -76,6 +100,12 @@ export default function AdminProjectsScreen() {
               icon="chevron-right"
               size={24}
               iconColor={colors.primary}
+            />
+            <IconButton
+              icon="pencil"
+              size={20}
+              iconColor={colors.primary}
+              onPress={(e) => handleEditProject(item, e)}
             />
           </View>
 
@@ -208,6 +238,15 @@ export default function AdminProjectsScreen() {
         style={styles.fab}
         onPress={handleCreateProject}
         color="#fff"
+      />
+
+      {/* Bottom Sheet Form */}
+      <ProjectFormSheet
+        visible={sheetVisible}
+        onDismiss={() => setSheetVisible(false)}
+        onSubmit={handleFormSubmit}
+        project={selectedForEdit}
+        mode={sheetMode}
       />
     </View>
   );
