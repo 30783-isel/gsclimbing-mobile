@@ -26,12 +26,9 @@ export interface SyncQueueItem {
 }
 
 /**
- * Serviço de armazenamento offline
+ * Serviço de armazenamento offline (versão classe)
  */
-export const offlineStorage = {
-  /**
-   * Guardar dados localmente
-   */
+class OfflineStorage {
   async save<T>(key: string, data: T): Promise<void> {
     try {
       const jsonValue = JSON.stringify(data);
@@ -41,11 +38,8 @@ export const offlineStorage = {
       console.error('Error saving to offline storage:', error);
       throw error;
     }
-  },
+  }
 
-  /**
-   * Obter dados locais
-   */
   async get<T>(key: string): Promise<T | null> {
     try {
       const jsonValue = await AsyncStorage.getItem(key);
@@ -54,11 +48,8 @@ export const offlineStorage = {
       console.error('Error getting from offline storage:', error);
       return null;
     }
-  },
+  }
 
-  /**
-   * Remover dados locais
-   */
   async remove(key: string): Promise<void> {
     try {
       await AsyncStorage.removeItem(key);
@@ -67,11 +58,8 @@ export const offlineStorage = {
       console.error('Error removing from offline storage:', error);
       throw error;
     }
-  },
+  }
 
-  /**
-   * Limpar todo o cache
-   */
   async clearAll(): Promise<void> {
     try {
       await AsyncStorage.multiRemove(Object.values(KEYS));
@@ -80,53 +68,32 @@ export const offlineStorage = {
       console.error('Error clearing offline storage:', error);
       throw error;
     }
-  },
+  }
 
-  /**
-   * Guardar projetos offline
-   */
   async saveProjects(projects: any[]): Promise<void> {
     await this.save(KEYS.PROJECTS, projects);
-  },
+  }
 
-  /**
-   * Obter projetos offline
-   */
   async getProjects(): Promise<any[]> {
     return (await this.get(KEYS.PROJECTS)) || [];
-  },
+  }
 
-  /**
-   * Guardar turbinas offline
-   */
   async saveTurbines(turbines: any[]): Promise<void> {
     await this.save(KEYS.TURBINES, turbines);
-  },
+  }
 
-  /**
-   * Obter turbinas offline
-   */
   async getTurbines(): Promise<any[]> {
     return (await this.get(KEYS.TURBINES)) || [];
-  },
+  }
 
-  /**
-   * Guardar relatórios offline
-   */
   async saveReports(reports: any[]): Promise<void> {
     await this.save(KEYS.REPORTS, reports);
-  },
+  }
 
-  /**
-   * Obter relatórios offline
-   */
   async getReports(): Promise<any[]> {
     return (await this.get(KEYS.REPORTS)) || [];
-  },
+  }
 
-  /**
-   * Adicionar item à queue de sincronização
-   */
   async addToSyncQueue(item: Omit<SyncQueueItem, 'id' | 'timestamp' | 'retries'>): Promise<void> {
     try {
       const queue = await this.getSyncQueue();
@@ -143,18 +110,12 @@ export const offlineStorage = {
       console.error('Error adding to sync queue:', error);
       throw error;
     }
-  },
+  }
 
-  /**
-   * Obter queue de sincronização
-   */
   async getSyncQueue(): Promise<SyncQueueItem[]> {
     return (await this.get(KEYS.SYNC_QUEUE)) || [];
-  },
+  }
 
-  /**
-   * Remover item da queue
-   */
   async removeFromSyncQueue(itemId: string): Promise<void> {
     try {
       const queue = await this.getSyncQueue();
@@ -165,11 +126,8 @@ export const offlineStorage = {
       console.error('Error removing from sync queue:', error);
       throw error;
     }
-  },
+  }
 
-  /**
-   * Atualizar item da queue (incrementar retries, erro)
-   */
   async updateSyncQueueItem(itemId: string, updates: Partial<SyncQueueItem>): Promise<void> {
     try {
       const queue = await this.getSyncQueue();
@@ -181,34 +139,22 @@ export const offlineStorage = {
       console.error('Error updating sync queue item:', error);
       throw error;
     }
-  },
+  }
 
-  /**
-   * Limpar queue de sincronização
-   */
   async clearSyncQueue(): Promise<void> {
     await this.save(KEYS.SYNC_QUEUE, []);
     console.log('🧹 Cleared sync queue');
-  },
+  }
 
-  /**
-   * Guardar última data de sincronização
-   */
   async saveLastSync(date: Date = new Date()): Promise<void> {
     await this.save(KEYS.LAST_SYNC, date.toISOString());
-  },
+  }
 
-  /**
-   * Obter última data de sincronização
-   */
   async getLastSync(): Promise<Date | null> {
     const dateStr = await this.get<string>(KEYS.LAST_SYNC);
     return dateStr ? new Date(dateStr) : null;
-  },
+  }
 
-  /**
-   * Obter estatísticas de armazenamento
-   */
   async getStorageStats(): Promise<{
     projects: number;
     turbines: number;
@@ -228,5 +174,8 @@ export const offlineStorage = {
       reports: reports.length,
       syncQueue: syncQueue.length,
     };
-  },
-};
+  }
+}
+
+// Instância exportada
+export const offlineStorage = new OfflineStorage();
