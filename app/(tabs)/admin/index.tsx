@@ -6,8 +6,9 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { useProjects } from '@/hooks/useProjects';
 import { ProjectFormSheet } from '@/components/ProjectFormSheet';
+import { FiltersSheet } from '@/components/FiltersSheet';
 import { colors, spacing } from '@/constants/theme';
-import type { Project } from '@/types/project.types';
+import type { Project, ProjectFilters } from '@/types/project.types';
 
 export default function AdminProjectsScreen() {
   const { t } = useTranslation();
@@ -22,6 +23,7 @@ export default function AdminProjectsScreen() {
     setSelectedProject,
     createProject,
     editProject,
+    filterProjects,
   } = useProjects();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,26 +31,39 @@ export default function AdminProjectsScreen() {
   const [sheetVisible, setSheetVisible] = useState(false);
   const [sheetMode, setSheetMode] = useState<'create' | 'edit'>('create');
   const [selectedForEdit, setSelectedForEdit] = useState<Project | null>(null);
+  const [filtersSheetVisible, setFiltersSheetVisible] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<ProjectFilters>({});
+  const [hasActiveFilters, setHasActiveFilters] = useState(false);
 
   // Carregar projetos ao montar componente
   useEffect(() => {
     loadProjects();
   }, []);
 
-  // Filtrar projetos localmente quando muda a query
+  // Filtrar projetos localmente quando muda a query ou filtros
   useEffect(() => {
+    let filtered = projects;
+
+    // Aplicar pesquisa de texto
     if (searchQuery.trim()) {
-      const filtered = projects.filter(
+      filtered = filtered.filter(
         (p) =>
           p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           p.country.toLowerCase().includes(searchQuery.toLowerCase()) ||
           p.location.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      setFilteredProjects(filtered);
-    } else {
-      setFilteredProjects(projects);
     }
+
+    setFilteredProjects(filtered);
   }, [searchQuery, projects]);
+
+  // Verificar se há filtros ativos
+  useEffect(() => {
+    const hasFilters = Object.values(activeFilters).some(
+      (value) => value && value.trim() !== ''
+    );
+    setHasActiveFilters(hasFilters);
+  }, [activeFilters]);
 
   const handleProjectPress = (project: Project) => {
     setSelectedProject(project);
@@ -74,6 +89,16 @@ export default function AdminProjectsScreen() {
     } else if (selectedForEdit) {
       await editProject(selectedForEdit.idProject, data);
     }
+    await loadProjects();
+  };
+
+  const handleApplyFilters = async (filters: ProjectFilters) => {
+    setActiveFilters(filters);
+    await filterProjects(filters);
+  };
+
+  const handleClearFilters = async () => {
+    setActiveFilters({});
     await loadProjects();
   };
 
@@ -181,13 +206,51 @@ export default function AdminProjectsScreen() {
       </View>
 
       {/* Searchbar */}
-      <Searchbar
-        placeholder={t('GSCLIMBING.SEARCH')}
-        onChangeText={setSearchQuery}
-        value={searchQuery}
-        style={styles.searchbar}
-        iconColor={colors.primary}
-      />
+      <View style={styles.searchContainer}>
+        <Searchbar
+          placeholder={t('GSCLIMBING.SEARCH')}
+          onChangeText={setSearchQuery}
+          value={searchQuery}
+          style={styles.searchbar}
+          iconColor={colors.primary}
+        />
+        <IconButton
+          icon={hasActiveFilters ? 'filter' : 'filter-outline'}
+          size={24}
+          iconColor={hasActiveFilters ? colors.primary : colors.textSecondary}
+          style={[
+            styles.filterButton,
+            hasActiveFilters && styles.filterButtonActive,
+          ]}
+          onPress={() => setFiltersSheetVisible(true)}
+        />
+      </View>
+
+      {/* Active Filters Chips */}
+      {hasActiveFilters && (
+        <View style={styles.activeFiltersContainer}>
+          {Object.entries(activeFilters).map(([key, value]) =>
+            value ? (
+              <Chip
+                key={key}
+                onClose={handleClearFilters}
+                style={styles.filterChip}
+                textStyle={styles.filterChipText}
+              >
+                {value}
+              </Chip>
+            ) : null
+          )}
+          <Chip
+            icon="close-circle"
+            onPress={handleClearFilters}
+            style={styles.clearFiltersChip}
+            textStyle={styles.clearFiltersText}
+          >
+            Limpar
+          </Chip>
+        </View>
+      )}
 
       {/* Stats */}
       <View style={styles.statsContainer}>
@@ -248,6 +311,15 @@ export default function AdminProjectsScreen() {
         project={selectedForEdit}
         mode={sheetMode}
       />
+
+      {/* Filters Sheet */}
+      <FiltersSheet
+        visible={filtersSheetVisible}
+        onDismiss={() => setFiltersSheetVisible(false)}
+        onApply={handleApplyFilters}
+        initialFilters={activeFilters}
+        resultCount={filteredProjects.length}
+      />
     </View>
   );
 }
@@ -281,10 +353,43 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: spacing.xs,
   },
-  searchbar: {
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  searchbar: {
+    flex: 1,
     elevation: 0,
     backgroundColor: colors.background,
+  },
+  filterButton: {
+    margin: 0,
+    backgroundColor: colors.surface,
+  },
+  filterButtonActive: {
+    backgroundColor: colors.primary + '20',
+  },
+  activeFiltersContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  filterChip: {
+    backgroundColor: colors.primary + '20',
+  },
+  filterChipText: {
+    color: colors.primary,
+    fontSize: 12,
+  },
+  clearFiltersChip: {
+    backgroundColor: colors.error + '20',
+  },
+  clearFiltersText: {
+    color: colors.error,
+    fontSize: 12,
   },
   statsContainer: {
     flexDirection: 'row',

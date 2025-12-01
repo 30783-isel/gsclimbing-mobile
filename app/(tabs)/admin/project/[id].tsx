@@ -4,6 +4,8 @@ import { Text, Card, IconButton, FAB, Chip, Portal, Dialog, Button } from 'react
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useProjects } from '@/hooks/useProjects';
+import { useTurbines } from '@/hooks/useTurbines';
+import { TurbineFormSheet } from '@/components/TurbineFormSheet';
 import { colors, spacing } from '@/constants/theme';
 import type { Turbine } from '@/types/turbine.types';
 
@@ -16,12 +18,18 @@ export default function ProjectDetailsScreen() {
     turbines,
     isLoading,
     loadProjectById,
-    loadTurbines,
     deleteProject,
   } = useProjects();
 
+  const {
+    loadTurbines,
+  } = useTurbines();
+
   const [activeTab, setActiveTab] = useState<'turbines' | 'reports' | 'historic'>('turbines');
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
+  const [turbineSheetVisible, setTurbineSheetVisible] = useState(false);
+  const [turbineSheetMode, setTurbineSheetMode] = useState<'create' | 'edit'>('create');
+  const [selectedTurbine, setSelectedTurbine] = useState<Turbine | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -51,11 +59,37 @@ export default function ProjectDetailsScreen() {
   };
 
   const handleAddTurbine = () => {
-    router.push(`/(tabs)/admin/project/${id}/turbine/create`);
+    setTurbineSheetMode('create');
+    setSelectedTurbine(null);
+    setTurbineSheetVisible(true);
   };
 
   const handleTurbinePress = (turbine: Turbine) => {
     router.push(`/(tabs)/admin/project/${id}/turbine/${turbine.id}`);
+  };
+
+  const handleEditTurbine = (turbine: Turbine, event: any) => {
+    event?.stopPropagation();
+    setTurbineSheetMode('edit');
+    setSelectedTurbine(turbine);
+    setTurbineSheetVisible(true);
+  };
+
+  const handleTurbineFormSubmit = async (data: any) => {
+    if (turbineSheetMode === 'create') {
+      // Criar nova turbina
+      if (selectedProject) {
+        await projectsAPI.addTurbine(selectedProject.name);
+      }
+    } else {
+      // Atualizar turbina existente
+      const formData = new FormData();
+      Object.keys(data).forEach(key => {
+        formData.append(key, data[key].toString());
+      });
+      await projectsAPI.updateTurbine(formData);
+    }
+    await loadTurbines(id);
   };
 
   if (isLoading || !selectedProject) {
@@ -234,11 +268,19 @@ export default function ProjectDetailsScreen() {
                             </Text>
                           )}
                         </View>
-                        <IconButton
-                          icon="chevron-right"
-                          size={24}
-                          iconColor={colors.primary}
-                        />
+                        <View style={styles.turbineActions}>
+                          <IconButton
+                            icon="pencil"
+                            size={20}
+                            iconColor={colors.primary}
+                            onPress={(e) => handleEditTurbine(turbine, e)}
+                          />
+                          <IconButton
+                            icon="chevron-right"
+                            size={24}
+                            iconColor={colors.primary}
+                          />
+                        </View>
                       </View>
 
                       <View style={styles.turbineChips}>
@@ -294,6 +336,16 @@ export default function ProjectDetailsScreen() {
           color="#fff"
         />
       )}
+
+      {/* Turbine Form Sheet */}
+      <TurbineFormSheet
+        visible={turbineSheetVisible}
+        onDismiss={() => setTurbineSheetVisible(false)}
+        onSubmit={handleTurbineFormSubmit}
+        turbine={selectedTurbine}
+        mode={turbineSheetMode}
+        projectId={id}
+      />
 
       {/* Delete Confirmation Dialog */}
       <Portal>
@@ -439,6 +491,10 @@ const styles = StyleSheet.create({
   },
   turbineInfo: {
     flex: 1,
+  },
+  turbineActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   turbineName: {
     fontWeight: 'bold',
