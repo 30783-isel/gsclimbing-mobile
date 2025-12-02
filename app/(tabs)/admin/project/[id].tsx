@@ -9,6 +9,7 @@ import { useTurbines } from '@/hooks/useTurbines';
 import { TurbineFormSheet } from '@/components/TurbineFormSheet';
 import { colors, spacing } from '@/constants/theme';
 import type { Turbine } from '@/types/turbine.types';
+import Toast from 'react-native-toast-message';
 
 export default function ProjectDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -76,22 +77,134 @@ export default function ProjectDetailsScreen() {
     setTurbineSheetVisible(true);
   };
 
-  const handleTurbineFormSubmit = async (data: any) => {
+const handleTurbineFormSubmit = async (data: any) => {
+  try {
+    console.log('🔍 Debug - Mode:', turbineSheetMode);
+    console.log('🔍 Debug - Data recebido:', data);
+    console.log('🔍 Debug - Selected Turbine:', selectedTurbine);
+    
     if (turbineSheetMode === 'create') {
-      // Criar nova turbina
-      if (selectedProject) {
-        await projectsAPI.addTurbine(selectedProject.name);
+      // ===== CRIAR NOVA TURBINA =====
+      if (!selectedProject) {
+        Alert.alert('Erro', 'Projeto não selecionado');
+        return;
       }
-    } else {
-      // Atualizar turbina existente
-      const formData = new FormData();
-      Object.keys(data).forEach(key => {
-        formData.append(key, data[key].toString());
+      
+      console.log('📝 Criando turbina no projeto:', selectedProject.name);
+      await projectsAPI.addTurbine(selectedProject.name);
+      
+      Toast.show({
+        type: 'success',
+        text1: 'Sucesso',
+        text2: 'Turbina criada com sucesso',
       });
+      
+    } else {
+      // ===== ATUALIZAR TURBINA EXISTENTE =====
+      
+      // Validação 1: Verificar se turbina está selecionada
+      if (!selectedTurbine) {
+        console.error('❌ selectedTurbine é null ou undefined');
+        Alert.alert('Erro', 'Nenhuma turbina selecionada para editar');
+        return;
+      }
+      
+      // Validação 2: Verificar se tem ID
+      if (!selectedTurbine.id) {
+        console.error('❌ selectedTurbine.id não existe:', selectedTurbine);
+        Alert.alert('Erro', 'ID da turbina não encontrado');
+        return;
+      }
+      
+      console.log('📝 Atualizando turbina ID:', selectedTurbine.id);
+      
+      // Criar FormData com campos corretos
+      const formData = new FormData();
+      
+      // Campo obrigatório: turbineId
+      formData.append('turbineId', selectedTurbine.id.toString());
+      
+      // 8 flags booleanos (obrigatórios)
+      // Usar valores do data ou valores atuais da turbina como fallback
+      formData.append(
+        'defectsInspectionReport',
+        (data.defectsInspectionReport ?? selectedTurbine.defectsInspectionReport ?? false) ? 'true' : 'false'
+      );
+      formData.append(
+        'examinationTransformer',
+        (data.examinationTransformer ?? selectedTurbine.examinationTransformer ?? false) ? 'true' : 'false'
+      );
+      formData.append(
+        'measurements6KV',
+        (data.measurements6KV ?? selectedTurbine.measurements6KV ?? false) ? 'true' : 'false'
+      );
+      formData.append(
+        'measurements690V400V',
+        (data.measurements690V400V ?? selectedTurbine.measurements690V400V ?? false) ? 'true' : 'false'
+      );
+      formData.append(
+        'measurementsMwSwitchgear',
+        (data.measurementsMwSwitchgear ?? selectedTurbine.measurementsMwSwitchgear ?? false) ? 'true' : 'false'
+      );
+      formData.append(
+        'onboardCraneInspectionReport',
+        (data.onboardCraneInspectionReport ?? selectedTurbine.onboardCraneInspectionReport ?? false) ? 'true' : 'false'
+      );
+      formData.append(
+        'performanceReportRepairElevator',
+        (data.performanceReportRepairElevator ?? selectedTurbine.performanceReportRepairElevator ?? false) ? 'true' : 'false'
+      );
+      formData.append(
+        'statutoryInspectionReport',
+        (data.statutoryInspectionReport ?? selectedTurbine.statutoryInspectionReport ?? false) ? 'true' : 'false'
+      );
+      
+      // Debug: Mostrar FormData
+      console.log('📦 FormData criado:');
+      console.log('  - turbineId:', selectedTurbine.id);
+      console.log('  - defectsInspectionReport:', data.defectsInspectionReport ?? selectedTurbine.defectsInspectionReport);
+      console.log('  - examinationTransformer:', data.examinationTransformer ?? selectedTurbine.examinationTransformer);
+      // ... outros flags
+      
+      // Fazer request
       await projectsAPI.updateTurbine(formData);
+      
+      console.log('✅ Turbina atualizada com sucesso');
+      
+      Toast.show({
+        type: 'success',
+        text1: 'Sucesso',
+        text2: 'Turbina atualizada com sucesso',
+      });
     }
+    
+    // Recarregar lista de turbinas
+    console.log('🔄 Recarregando lista de turbinas...');
     await loadTurbines(id);
-  };
+    
+    // Fechar modal
+    setTurbineSheetVisible(false);
+    
+  } catch (error: any) {
+    console.error('❌ Erro ao submeter formulário:', error);
+    console.error('❌ Error details:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+    });
+    
+    const errorMessage = 
+      error.response?.data?.message || 
+      error.response?.data || 
+      error.message || 
+      'Erro desconhecido ao atualizar turbina';
+    
+    Alert.alert(
+      'Erro',
+      typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage)
+    );
+  }
+};
 
   if (isLoading || !selectedProject) {
     return (
