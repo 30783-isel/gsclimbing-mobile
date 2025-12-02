@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { projectsAPI } from '@/services/api/projects.api';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { Text, Card, IconButton, FAB, Chip, Portal, Dialog, Button } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';

@@ -55,6 +55,7 @@
     "UPLOAD_REPORT": "Subir Informe",
     "CONFIRM_DELETE": "¿Está seguro de que desea eliminar?",
     "NO_DATA": "No hay datos disponibles",
-    "TRY_AGAIN": "Intentar de nuevo"
+    "TRY_AGAIN": "Intentar de nuevo",
+    "ADDTURBINE": "Agregar turbina"
   }
 }

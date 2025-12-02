@@ -55,6 +55,7 @@
     "UPLOAD_REPORT": "Upload Report",
     "CONFIRM_DELETE": "Are you sure you want to delete?",
     "NO_DATA": "No data available",
-    "TRY_AGAIN": "Try again"
+    "TRY_AGAIN": "Try again",
+    "ADDTURBINE": "Add Turbine"
   }
 }

@@ -34,6 +34,7 @@
     "SYNC": "Sincronizar",
     "SYNCING": "A sincronizar...",
     "SYNC_SUCCESS": "Sincronização concluída",
-    "SYNC_ERROR": "Erro na sincronização"
+    "SYNC_ERROR": "Erro na sincronização",
+    "ADDTURBINE": "Adicionar turbina"
   }
 }

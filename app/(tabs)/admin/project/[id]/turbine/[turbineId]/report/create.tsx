@@ -5,9 +5,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { CameraComponent } from '@/components/CameraComponent';
 import { PhotoGallery } from '@/components/PhotoGallery';
+import { useReports } from '@/hooks/useReports';
+import { useAuthStore } from '@/store/authStore';
 import { colors, spacing } from '@/constants/theme';
 import { ReportType, REPORT_TYPE_NAMES } from '@/types/report.types';
-import type { ReportPhoto } from '@/types/report.types';
+import type { ReportPhoto, CreateReportDTO } from '@/types/report.types';
 
 export default function CreateReportScreen() {
   const { id, turbineId, type } = useLocalSearchParams<{
@@ -18,14 +20,23 @@ export default function CreateReportScreen() {
   const router = useRouter();
   const { t } = useTranslation();
 
+  // Hooks
+  const { createReport, uploadPhotos } = useReports();
+  const { user } = useAuthStore();
+
+  // Parse report type
   const reportType = parseInt(type || '0') as ReportType;
   const reportTypeName = REPORT_TYPE_NAMES[reportType];
 
+  // State
   const [observations, setObservations] = useState('');
   const [photos, setPhotos] = useState<ReportPhoto[]>([]);
   const [cameraVisible, setCameraVisible] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  /**
+   * Handler quando uma foto é tirada
+   */
   const handlePhotoTaken = (uri: string) => {
     const newPhoto: ReportPhoto = {
       id: Date.now().toString(),
@@ -43,6 +54,9 @@ export default function CreateReportScreen() {
     setCameraVisible(false);
   };
 
+  /**
+   * Handler para eliminar foto
+   */
   const handleDeletePhoto = (photoId: string) => {
     Alert.alert(
       'Eliminar Foto',
@@ -60,38 +74,120 @@ export default function CreateReportScreen() {
     );
   };
 
+  /**
+   * Handler para guardar relatório
+   * Cria o relatório e faz upload das fotos
+   */
   const handleSave = async () => {
+    // Validação: pelo menos 1 foto
     if (photos.length === 0) {
       Alert.alert('Atenção', 'Adicione pelo menos uma foto ao relatório');
       return;
     }
 
-    setSaving(true);
-    try {
-      // TODO: Implementar criação do relatório via API
-      // TODO: Upload das fotos
-      console.log('Saving report:', {
-        turbineId,
-        type: reportType,
-        observations,
-        photos: photos.length,
-      });
+    // Validação: user autenticado
+    if (!user) {
+      Alert.alert('Erro', 'Utilizador não autenticado');
+      return;
+    }
 
+    setSaving(true);
+
+    try {
+      // 1. Criar relatório
+      console.log('📝 Criando relatório...');
+      const reportData: CreateReportDTO = {
+        userId: user.idUser,
+        site: '', // Pode ser preenchido se tiveres info da turbina
+        wtgNumber: turbineId,
+        projectoId: parseInt(id),
+        turbinaId: parseInt(turbineId),
+        typeReport: reportType,
+      };
+
+      const newReport = await createReport(reportData);
+      console.log('✅ Relatório criado com ID:', newReport.reportId);
+
+      // 2. Upload das fotos
+      console.log(`📸 Iniciando upload de ${photos.length} fotos...`);
+      const uploadResults = await uploadPhotos(
+        newReport.reportId.toString(),
+        photos
+      );
+
+      // Verificar resultados
+      const successCount = uploadResults.filter((r) => r.success).length;
+      const failCount = uploadResults.length - successCount;
+
+      // 3. Mostrar resultado
+      if (failCount === 0) {
+        // Tudo OK
+        Alert.alert(
+          '✅ Sucesso!',
+          `Relatório criado com ${photos.length} foto(s)`,
+          [
+            {
+              text: 'OK',
+              onPress: () => router.back(),
+            },
+          ]
+        );
+      } else if (successCount > 0) {
+        // Parcial
+        Alert.alert(
+          '⚠️ Atenção',
+          `Relatório criado mas apenas ${successCount} de ${photos.length} fotos foram carregadas.`,
+          [
+            {
+              text: 'OK',
+              onPress: () => router.back(),
+            },
+          ]
+        );
+      } else {
+        // Nenhuma foto carregada
+        Alert.alert(
+          '❌ Erro',
+          'Relatório criado mas nenhuma foto foi carregada. Tente fazer upload manualmente.',
+          [
+            {
+              text: 'OK',
+              onPress: () => router.back(),
+            },
+          ]
+        );
+      }
+    } catch (error: any) {
+      console.error('❌ Erro ao guardar relatório:', error);
+      
       Alert.alert(
-        'Sucesso',
-        'Relatório criado com sucesso',
+        'Erro',
+        error.message || 'Não foi possível criar o relatório. Tente novamente.'
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /**
+   * Handler para cancelar
+   */
+  const handleCancel = () => {
+    if (photos.length > 0) {
+      Alert.alert(
+        'Cancelar',
+        'Tem certeza? As fotos serão perdidas.',
         [
+          { text: 'Continuar editando', style: 'cancel' },
           {
-            text: 'OK',
+            text: 'Sim, cancelar',
+            style: 'destructive',
             onPress: () => router.back(),
           },
         ]
       );
-    } catch (error) {
-      console.error('Error saving report:', error);
-      Alert.alert('Erro', 'Não foi possível criar o relatório');
-    } finally {
-      setSaving(false);
+    } else {
+      router.back();
     }
   };
 
@@ -108,7 +204,7 @@ export default function CreateReportScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Observations Card */}
+        {/* Observações */}
         <Card style={styles.card}>
           <Card.Content>
             <Text variant="titleMedium" style={styles.cardTitle}>
@@ -122,17 +218,19 @@ export default function CreateReportScreen() {
               numberOfLines={6}
               placeholder="Adicione observações sobre a inspeção..."
               style={styles.textArea}
+              disabled={saving}
             />
           </Card.Content>
         </Card>
 
-        {/* Photos Section */}
+        {/* Fotos */}
         <Card style={styles.card}>
           <Card.Content>
             <PhotoGallery
               photos={photos}
               onAddPhoto={() => setCameraVisible(true)}
               onDeletePhoto={handleDeletePhoto}
+              readonly={saving}
             />
           </Card.Content>
         </Card>
@@ -140,16 +238,21 @@ export default function CreateReportScreen() {
         {/* Info */}
         <View style={styles.infoContainer}>
           <Text variant="bodySmall" style={styles.infoText}>
-            💡 As fotos serão sincronizadas automaticamente quando houver conexão
+            💡 Adicione pelo menos 1 foto para criar o relatório
           </Text>
+          {photos.length > 0 && (
+            <Text variant="bodySmall" style={styles.infoText}>
+              📸 {photos.length} foto(s) adicionada(s)
+            </Text>
+          )}
         </View>
       </ScrollView>
 
-      {/* Bottom Actions */}
+      {/* Botões */}
       <View style={styles.actions}>
         <Button
           mode="outlined"
-          onPress={() => router.back()}
+          onPress={handleCancel}
           style={styles.cancelButton}
           disabled={saving}
         >
@@ -162,15 +265,15 @@ export default function CreateReportScreen() {
           loading={saving}
           disabled={saving || photos.length === 0}
         >
-          Guardar
+          {saving ? 'A guardar...' : 'Guardar'}
         </Button>
       </View>
 
-      {/* Camera Modal */}
+      {/* Modal da Câmara */}
       <Modal
         visible={cameraVisible}
         animationType="slide"
-        onRequestClose={() => setCameraVisible(false)}
+        onRequestClose={() => !saving && setCameraVisible(false)}
       >
         <CameraComponent
           onPhotoTaken={handlePhotoTaken}
@@ -225,6 +328,7 @@ const styles = StyleSheet.create({
   infoText: {
     color: colors.info,
     textAlign: 'center',
+    marginVertical: 2,
   },
   actions: {
     flexDirection: 'row',
@@ -232,6 +336,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+    backgroundColor: colors.white,
   },
   cancelButton: {
     flex: 1,
