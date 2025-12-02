@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Image, TouchableOpacity, FlatList, Dimensions, Modal } from 'react-native';
+import { View, StyleSheet, Image, TouchableOpacity, ScrollView, Dimensions, Modal } from 'react-native';
 import { Text, IconButton, Portal, FAB } from 'react-native-paper';
 import { colors, spacing } from '@/constants/theme';
 import type { ReportPhoto } from '@/types/report.types';
@@ -36,60 +36,78 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
     }
   };
 
-  const renderPhoto = ({ item }: { item: ReportPhoto }) => (
-    <TouchableOpacity
-      style={styles.photoContainer}
-      onPress={() => handlePhotoPress(item)}
-      activeOpacity={0.7}
-    >
-      <Image
-        source={{ uri: item.uri }}
-        style={styles.photo}
-        resizeMode="cover"
-      />
-      
-      {/* Upload Status */}
-      {item.isOffline && !item.isUploaded && (
-        <View style={styles.statusBadge}>
-          <Text style={styles.statusText}>📤</Text>
-        </View>
-      )}
-      {item.isUploaded && (
-        <View style={[styles.statusBadge, styles.uploadedBadge]}>
-          <Text style={styles.statusText}>✓</Text>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
+  // ✅ Garantir que photos é sempre um array válido
+  const safePhotos = Array.isArray(photos) ? photos.filter(p => p && p.id && p.uri) : [];
 
-  const renderEmpty = () => (
-    <View style={styles.emptyContainer}>
-      <Text variant="bodyLarge" style={styles.emptyText}>
-        📷 Nenhuma foto adicionada
-      </Text>
-      <Text variant="bodySmall" style={styles.emptySubtext}>
-        Toque no botão + para adicionar fotos
-      </Text>
-    </View>
-  );
+  console.log('📸 PhotoGallery render:', {
+    photosReceived: photos,
+    safePhotosLength: safePhotos.length,
+    isArray: Array.isArray(photos)
+  });
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text variant="titleMedium" style={styles.title}>
-          Fotos ({photos.length})
+          Fotos ({safePhotos.length})
         </Text>
       </View>
 
-      <FlatList
-        data={photos}
-        renderItem={renderPhoto}
-        keyExtractor={(item) => item.id}
-        numColumns={3}
-        contentContainerStyle={styles.grid}
-        ListEmptyComponent={renderEmpty}
+      {/* ✅ USAR ScrollView em vez de FlatList para maior estabilidade */}
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-      />
+      >
+        {safePhotos.length === 0 ? (
+          // Empty state
+          <View style={styles.emptyContainer}>
+            <Text variant="bodyLarge" style={styles.emptyText}>
+              📷 Nenhuma foto adicionada
+            </Text>
+            <Text variant="bodySmall" style={styles.emptySubtext}>
+              Toque no botão + para adicionar fotos
+            </Text>
+          </View>
+        ) : (
+          // Grid de fotos
+          <View style={styles.grid}>
+            {safePhotos.map((item, index) => {
+              // Validação extra por item
+              if (!item || !item.uri) {
+                console.warn('⚠️ Photo item inválido:', item);
+                return null;
+              }
+
+              return (
+                <TouchableOpacity
+                  key={item.id || `photo-${index}`}
+                  style={styles.photoContainer}
+                  onPress={() => handlePhotoPress(item)}
+                  activeOpacity={0.7}
+                >
+                  <Image
+                    source={{ uri: item.uri }}
+                    style={styles.photo}
+                    resizeMode="cover"
+                  />
+                  
+                  {/* Upload Status */}
+                  {item.isOffline && !item.isUploaded && (
+                    <View style={styles.statusBadge}>
+                      <Text style={styles.statusText}>📤</Text>
+                    </View>
+                  )}
+                  {item.isUploaded && (
+                    <View style={[styles.statusBadge, styles.uploadedBadge]}>
+                      <Text style={styles.statusText}>✓</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+      </ScrollView>
 
       {!readonly && (
         <FAB
@@ -130,7 +148,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
               )}
             </View>
 
-            {selectedPhoto && (
+            {selectedPhoto && selectedPhoto.uri && (
               <Image
                 source={{ uri: selectedPhoto.uri }}
                 style={styles.previewImage}
@@ -171,9 +189,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.text,
   },
-  grid: {
+  scrollContent: {
     padding: spacing.md,
     paddingBottom: 100,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
   },
   photoContainer: {
     width: PHOTO_SIZE,
@@ -182,6 +205,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     position: 'relative',
+    backgroundColor: colors.surfaceVariant,
   },
   photo: {
     width: '100%',
@@ -191,7 +215,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 4,
     right: 4,
-    backgroundColor: colors.warning,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderRadius: 12,
     width: 24,
     height: 24,
@@ -199,7 +223,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   uploadedBadge: {
-    backgroundColor: colors.success,
+    backgroundColor: colors.success + '99',
   },
   statusText: {
     fontSize: 12,
@@ -209,23 +233,25 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: spacing.xxl,
+    paddingVertical: spacing.xl * 2,
+    minHeight: 200,
   },
   emptyText: {
     color: colors.textSecondary,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
+    textAlign: 'center',
   },
   emptySubtext: {
-    color: colors.textLight,
+    color: colors.textSecondary,
     textAlign: 'center',
   },
   fab: {
     position: 'absolute',
-    margin: spacing.md,
-    right: 0,
-    bottom: 0,
+    right: spacing.md,
+    bottom: spacing.md,
     backgroundColor: colors.primary,
   },
+  // Modal styles
   modalContainer: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.95)',
@@ -234,21 +260,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 50,
-    paddingHorizontal: spacing.md,
+    paddingTop: 40,
+    paddingHorizontal: spacing.sm,
   },
   modalTitle: {
     color: colors.white,
-    fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'center',
   },
   previewImage: {
     flex: 1,
     width: '100%',
   },
   photoInfo: {
-    padding: spacing.lg,
+    padding: spacing.md,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: spacing.sm,
   },
   photoInfoText: {
     color: colors.white,
@@ -262,6 +291,5 @@ const styles = StyleSheet.create({
   offlineText: {
     color: colors.warning,
     fontSize: 14,
-    fontWeight: 'bold',
   },
 });
