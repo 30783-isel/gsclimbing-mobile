@@ -126,6 +126,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
         numColumns={2}
         contentContainerStyle={styles.gridContainer}
         showsVerticalScrollIndicator={false}
+        scrollEnabled={false}
       />
 
       <Modal
