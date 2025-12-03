@@ -281,50 +281,65 @@ export const useDefectInspectionForm = (
   }, [formData, user]);
 
   // Submeter relatório
-  const submit = useCallback(async () => {
-    if (!formData.projectoId || !formData.turbinaId) {
-      Alert.alert('Erro', 'Projeto ou Turbina não especificados');
+const submit = useCallback(async () => {
+  if (!formData.projectoId || !formData.turbinaId) {
+    Alert.alert('Erro', 'Projeto ou Turbina não especificados');
+    return null;
+  }
+
+  setIsSubmitting(true);
+
+  try {
+    // ✅ 1. CRIAR RELATÓRIO PRIMEIRO (sem fotos)
+    console.log('📝 Creating report without photos...');
+    const dto = toDTO();
+    const response = await defectInspectionReportAPI.create(dto);
+
+    if (!response.success) {
+      Alert.alert('Erro', response.message || 'Erro ao criar relatório');
       return null;
     }
 
-    setIsSubmitting(true);
+    console.log('✅ Report created with UUID:', response.uuid);
 
-    try {
-      // 1. Upload de fotos pendentes (se houver)
-      const tempReportId = 'temp'; // Usar um ID temporário ou criar relatório vazio primeiro
+    // ✅ 2. DEPOIS fazer upload das fotos com o UUID correto
+    const reportUuid = response.uuid; // ← Usar o UUID retornado!
+    
+    if (formData.photos.length > 0) {
+      console.log(`📤 Uploading ${formData.photos.length} photo(s)...`);
       
       for (const photo of formData.photos) {
         if (!photo.isUploaded) {
-          await uploadPhoto(photo, tempReportId);
+          console.log(`📷 Uploading photo: ${photo.id}`);
+          await uploadPhoto(photo, reportUuid); // ← Usar o UUID REAL, não 'temp'
         }
       }
-
-      // 2. Criar relatório
-      const dto = toDTO();
-      const response = await defectInspectionReportAPI.create(dto);
-
-      if (response.success) {
-        Alert.alert(
-          'Sucesso! ✅',
-          `Relatório criado com ID: ${response.reportId}`,
-          [{ text: 'OK' }]
-        );
-        return response;
-      } else {
-        Alert.alert('Erro', response.message || 'Erro ao criar relatório');
-        return null;
-      }
-    } catch (error: any) {
-      console.error('Error submitting report:', error);
-      Alert.alert(
-        'Erro',
-        error.response?.data || 'Erro ao submeter relatório'
-      );
-      return null;
-    } finally {
-      setIsSubmitting(false);
+      
+      console.log('✅ All photos uploaded');
     }
-  }, [formData, uploadPhoto, toDTO]);
+
+    Alert.alert(
+      'Sucesso! ✅',
+      `Relatório criado com ID: ${response.reportId}${
+        formData.photos.length > 0 
+          ? `\n${formData.photos.length} foto(s) enviada(s)` 
+          : ''
+      }`,
+      [{ text: 'OK' }]
+    );
+    
+    return response;
+  } catch (error: any) {
+    console.error('❌ Error submitting report:', error);
+    Alert.alert(
+      'Erro',
+      error.response?.data?.message || error.message || 'Erro ao submeter relatório'
+    );
+    return null;
+  } finally {
+    setIsSubmitting(false);
+  }
+}, [formData, uploadPhoto, toDTO]);
 
   return {
     formData,
