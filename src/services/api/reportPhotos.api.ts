@@ -52,7 +52,7 @@ export const reportPhotosAPI = {
     const baseUrlClean = API_CONFIG.baseUrl.endsWith('/') 
       ? API_CONFIG.baseUrl.slice(0, -1) 
       : API_CONFIG.baseUrl;
-    return `${baseUrlClean}/api/reports/mobile/files/download/${hash}`;
+    return `${baseUrlClean}/reports/mobile/files/download/${hash}`;
   },
 
   /**

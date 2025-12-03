@@ -89,6 +89,13 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
     const photoUrl = reportPhotosAPI.getPhotoUrl(item.hash);
     const hasValidDescription = item.description && item.description.trim().length > 1;
 
+    console.log('📸 Rendering photo:', {
+      fileId: item.fileId,
+      hash: item.hash,
+      url: photoUrl,
+      name: item.name,
+    });
+
     return (
       <TouchableOpacity
         style={styles.photoThumbnailContainer}
@@ -100,6 +107,8 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
             source={{ uri: photoUrl }}
             style={styles.thumbnailImage}
             resizeMode="cover"
+            onLoad={() => console.log('✅ Image loaded:', item.hash)}
+            onError={(e) => console.error('❌ Image error:', item.hash, e.nativeEvent.error)}
           />
           {hasValidDescription && (
             <View style={styles.photoOverlay}>
