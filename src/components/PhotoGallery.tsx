@@ -87,6 +87,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
 
   const renderPhotoItem = ({ item }: { item: ReportPhotoData }) => {
     const photoUrl = reportPhotosAPI.getPhotoUrl(item.hash);
+    const hasValidDescription = item.description && item.description.trim().length > 1;
 
     return (
       <TouchableOpacity
@@ -100,7 +101,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
             style={styles.thumbnailImage}
             resizeMode="cover"
           />
-          {item.description && (
+          {hasValidDescription && (
             <View style={styles.photoOverlay}>
               <Text
                 variant="bodySmall"
@@ -127,7 +128,6 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
         showsVerticalScrollIndicator={false}
       />
 
-      {/* Modal para ver foto em tamanho completo */}
       <Modal
         visible={modalVisible}
         transparent={true}
@@ -147,7 +147,6 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
                   showsVerticalScrollIndicator={false}
                   bounces={false}
                 >
-                  {/* Botão Fechar */}
                   <Surface style={styles.closeButtonContainer} elevation={4}>
                     <IconButton
                       icon="close"
@@ -158,7 +157,6 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
                     />
                   </Surface>
 
-                  {/* Imagem em tamanho completo */}
                   <TouchableOpacity activeOpacity={1}>
                     <Image
                       source={{
@@ -169,7 +167,6 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
                     />
                   </TouchableOpacity>
 
-                  {/* Informações da foto */}
                   <Surface style={styles.photoInfoContainer} elevation={3}>
                     {selectedPhoto.description && (
                       <View style={styles.infoRow}>
