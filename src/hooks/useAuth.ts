@@ -17,24 +17,39 @@ export const useAuth = () => {
       await authAPI.login(credentials);
       const roleData = await authAPI.getRole();
       
+      // ⚠️ IMPORTANTE: O backend retorna "ROLE_ADMIN" ou "ROLE_TECH"
+      // Precisamos remover o prefixo "ROLE_"
+      let roleValue = roleData.message;
+      if (roleValue.startsWith('ROLE_')) {
+        roleValue = roleValue.replace('ROLE_', '') as 'ADMIN' | 'TECH';
+      }
+      
+      console.log('🔐 Login Debug:', {
+        rawRole: roleData.message,
+        cleanRole: roleValue
+      });
+      
       const userData = {
         username: credentials.username,
         idUser: '',
         name: '',
         email: '',
         active: 'true',
-        roles: roleData.message as 'ADMIN' | 'TECH',
+        roles: roleValue as 'ADMIN' | 'TECH',
       };
       
-      await login(userData, roleData.message);
+      await login(userData, roleValue as 'ADMIN' | 'TECH');
       
       // Navegar conforme role
-      if (roleData.message === 'ADMIN') {
+      if (roleValue === 'ADMIN') {
+        console.log('➡️ Navigating to ADMIN tab');
         router.replace('/(tabs)/admin');
-      } else {
+      } else if (roleValue === 'TECH') {
+        console.log('➡️ Navigating to TECH tab');
         router.replace('/(tabs)/tech');
       }
     } catch (error) {
+      console.error('❌ Login error:', error);
       throw error;
     }
   };

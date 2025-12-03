@@ -195,7 +195,7 @@ export default function AdminProjectsScreen() {
             {t('GSCLIMBING.PROJECTS')}
           </Text>
           <Text variant="bodyMedium" style={styles.subtitle}>
-            Olá, {user?.username}! 👋
+            Olá Admin, {user?.username}! 👋
           </Text>
         </View>
         <View style={styles.headerRight}>

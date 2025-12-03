@@ -33,6 +33,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       await AsyncStorage.setItem('role', role);
       await AsyncStorage.setItem('username', user.username);
       
+      console.log('💾 Saved to AsyncStorage:', { role });
+      
       set({
         user,
         role,
@@ -60,17 +62,35 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   initializeAuth: async () => {
     try {
-      const [userStr, role] = await AsyncStorage.multiGet(['user', 'role']);
+      const [userStr, roleStr] = await AsyncStorage.multiGet(['user', 'role']);
 
-      if (userStr[1] && role[1]) {
+      console.log('🔄 Initializing auth from AsyncStorage:', {
+        hasUser: !!userStr[1],
+        rawRole: roleStr[1]
+      });
+
+      if (userStr[1] && roleStr[1]) {
         const user = JSON.parse(userStr[1]);
+        
+        // ⚠️ IMPORTANTE: Remover o prefixo "ROLE_" se existir
+        let cleanRole = roleStr[1];
+        if (cleanRole.startsWith('ROLE_')) {
+          cleanRole = cleanRole.replace('ROLE_', '');
+        }
+        
+        console.log('✅ Auth initialized:', {
+          username: user.username,
+          role: cleanRole
+        });
+        
         set({
           user,
-          role: role[1] as 'ADMIN' | 'TECH',
+          role: cleanRole as 'ADMIN' | 'TECH',
           isAuthenticated: true,
           isLoading: false,
         });
       } else {
+        console.log('❌ No auth data found');
         set({ isLoading: false });
       }
     } catch (error) {

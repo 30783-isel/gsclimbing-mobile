@@ -38,7 +38,7 @@ export default function TechScreen() {
             {t('GSCLIMBING.REPORTS')}
           </Text>
           <Text variant="bodyMedium" style={styles.subtitle}>
-            Olá, {user?.username}!
+            Olá Tech, {user?.username}!
           </Text>
         </View>
         <Button 

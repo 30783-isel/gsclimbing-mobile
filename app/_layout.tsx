@@ -21,15 +21,48 @@ export default function RootLayout() {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const inTabsGroup = segments[0] === '(tabs)';
+    const currentPath = segments.join('/');
+
+    console.log('Navigation Debug:', {
+      isAuthenticated,
+      role,
+      segments,
+      currentPath,
+      inAuthGroup,
+      inTabsGroup
+    });
 
     if (!isAuthenticated && !inAuthGroup) {
+      // Não autenticado: ir para login
       router.replace('/(auth)/login');
     } else if (isAuthenticated && inAuthGroup) {
-      // Redirecionar baseado no role
+      // Autenticado mas ainda em auth: redirecionar para a tab correta
       if (role === 'ADMIN') {
         router.replace('/(tabs)/admin');
-      } else {
+      } else if (role === 'TECH') {
         router.replace('/(tabs)/tech');
+      }
+    } else if (isAuthenticated && role) {
+      // Verificar se está na tab errada e corrigir
+      const shouldBeInAdmin = role === 'ADMIN';
+      const shouldBeInTech = role === 'TECH';
+      const isInTech = currentPath.includes('tech') || currentPath.includes('(tabs)/tech');
+      const isInAdmin = currentPath.includes('admin') || currentPath.includes('(tabs)/admin');
+
+      if (shouldBeInAdmin && (isInTech || (!isInAdmin && inTabsGroup))) {
+        console.log('🔄 Redirecting ADMIN user from tech to admin');
+        router.replace('/(tabs)/admin');
+      } else if (shouldBeInTech && (isInAdmin || (!isInTech && inTabsGroup))) {
+        console.log('🔄 Redirecting TECH user from admin to tech');
+        router.replace('/(tabs)/tech');
+      } else if (!inAuthGroup && !inTabsGroup) {
+        // Não está em nenhum grupo: ir para a tab correta
+        if (shouldBeInAdmin) {
+          router.replace('/(tabs)/admin');
+        } else {
+          router.replace('/(tabs)/tech');
+        }
       }
     }
   }, [isAuthenticated, isLoading, segments, role]);
