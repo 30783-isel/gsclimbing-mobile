@@ -16,6 +16,7 @@ export const API_CONFIG = {
   baseUsersUrl: `${BASE_URL}/api/user/`,
   baseReportsUrl: `${BASE_URL}/api/reports/`,
   baseFilesUrl: `${BASE_URL}/api/reports/files/`,
+  baseMobileReportsUrl: `${BASE_URL}/api/reports/mobile/`,
 };
 
 export const TIMEOUT = 30000;

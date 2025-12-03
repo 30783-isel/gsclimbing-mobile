@@ -1,295 +1,323 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Image, TouchableOpacity, ScrollView, Dimensions, Modal } from 'react-native';
-import { Text, IconButton, Portal, FAB } from 'react-native-paper';
+import {
+  View,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Image,
+  Modal,
+  Dimensions,
+  ScrollView,
+} from 'react-native';
+import {
+  Text,
+  ActivityIndicator,
+  IconButton,
+  Surface,
+} from 'react-native-paper';
 import { colors, spacing } from '@/constants/theme';
-import type { ReportPhoto } from '@/types/report.types';
+import type { ReportPhotoData } from '@/services/api/reportPhotos.api';
+import { reportPhotosAPI } from '@/services/api/reportPhotos.api';
 
-const { width } = Dimensions.get('window');
-const PHOTO_SIZE = (width - spacing.md * 4) / 3;
+const { width, height } = Dimensions.get('window');
+const THUMBNAIL_SIZE = (width - spacing.md * 3) / 2;
 
 interface PhotoGalleryProps {
-  photos: ReportPhoto[];
-  onAddPhoto: () => void;
-  onDeletePhoto: (photoId: string) => void;
-  readonly?: boolean;
+  photos: ReportPhotoData[];
+  isLoading?: boolean;
 }
 
 export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
   photos,
-  onAddPhoto,
-  onDeletePhoto,
-  readonly = false,
+  isLoading = false,
 }) => {
-  const [selectedPhoto, setSelectedPhoto] = useState<ReportPhoto | null>(null);
-  const [previewVisible, setPreviewVisible] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<ReportPhotoData | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
-  const handlePhotoPress = (photo: ReportPhoto) => {
+  const openPhoto = (photo: ReportPhotoData) => {
     setSelectedPhoto(photo);
-    setPreviewVisible(true);
+    setModalVisible(true);
   };
 
-  const handleDeletePhoto = () => {
-    if (selectedPhoto) {
-      onDeletePhoto(selectedPhoto.id);
-      setPreviewVisible(false);
-      setSelectedPhoto(null);
-    }
+  const closePhoto = () => {
+    setModalVisible(false);
+    setTimeout(() => setSelectedPhoto(null), 300);
   };
 
-  // ✅ Garantir que photos é sempre um array válido
-  const safePhotos = Array.isArray(photos) ? photos.filter(p => p && p.id && p.uri) : [];
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('pt-PT', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
 
-  console.log('📸 PhotoGallery render:', {
-    photosReceived: photos,
-    safePhotosLength: safePhotos.length,
-    isArray: Array.isArray(photos)
-  });
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text variant="titleMedium" style={styles.title}>
-          Fotos ({safePhotos.length})
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>A carregar fotografias...</Text>
+      </View>
+    );
+  }
+
+  if (photos.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <IconButton
+          icon="image-off-outline"
+          size={48}
+          iconColor={colors.lightGray}
+        />
+        <Text variant="bodyMedium" style={styles.emptyText}>
+          Sem fotografias disponíveis
         </Text>
       </View>
+    );
+  }
 
-      {/* ✅ USAR ScrollView em vez de FlatList para maior estabilidade */}
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+  const renderPhotoItem = ({ item }: { item: ReportPhotoData }) => {
+    const photoUrl = reportPhotosAPI.getPhotoUrl(item.hash);
+
+    return (
+      <TouchableOpacity
+        style={styles.photoThumbnailContainer}
+        onPress={() => openPhoto(item)}
+        activeOpacity={0.8}
       >
-        {safePhotos.length === 0 ? (
-          // Empty state
-          <View style={styles.emptyContainer}>
-            <Text variant="bodyLarge" style={styles.emptyText}>
-              📷 Nenhuma foto adicionada
-            </Text>
-            <Text variant="bodySmall" style={styles.emptySubtext}>
-              Toque no botão + para adicionar fotos
-            </Text>
-          </View>
-        ) : (
-          // Grid de fotos
-          <View style={styles.grid}>
-            {safePhotos.map((item, index) => {
-              // Validação extra por item
-              if (!item || !item.uri) {
-                console.warn('⚠️ Photo item inválido:', item);
-                return null;
-              }
-
-              return (
-                <TouchableOpacity
-                  key={item.id || `photo-${index}`}
-                  style={styles.photoContainer}
-                  onPress={() => handlePhotoPress(item)}
-                  activeOpacity={0.7}
-                >
-                  <Image
-                    source={{ uri: item.uri }}
-                    style={styles.photo}
-                    resizeMode="cover"
-                  />
-                  
-                  {/* Upload Status */}
-                  {item.isOffline && !item.isUploaded && (
-                    <View style={styles.statusBadge}>
-                      <Text style={styles.statusText}>📤</Text>
-                    </View>
-                  )}
-                  {item.isUploaded && (
-                    <View style={[styles.statusBadge, styles.uploadedBadge]}>
-                      <Text style={styles.statusText}>✓</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-      </ScrollView>
-
-      {!readonly && (
-        <FAB
-          icon="camera"
-          style={styles.fab}
-          onPress={onAddPhoto}
-          color="#fff"
-          label="Foto"
-        />
-      )}
-
-      {/* Photo Preview Modal */}
-      <Portal>
-        <Modal
-          visible={previewVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setPreviewVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <IconButton
-                icon="close"
-                size={28}
-                iconColor={colors.white}
-                onPress={() => setPreviewVisible(false)}
-              />
-              <Text variant="titleMedium" style={styles.modalTitle}>
-                Foto
+        <Surface style={styles.photoThumbnail} elevation={2}>
+          <Image
+            source={{ uri: photoUrl }}
+            style={styles.thumbnailImage}
+            resizeMode="cover"
+          />
+          {item.description && (
+            <View style={styles.photoOverlay}>
+              <Text
+                variant="bodySmall"
+                style={styles.photoDescription}
+                numberOfLines={2}
+              >
+                {item.description}
               </Text>
-              {!readonly && (
-                <IconButton
-                  icon="delete"
-                  size={28}
-                  iconColor={colors.error}
-                  onPress={handleDeletePhoto}
-                />
+            </View>
+          )}
+        </Surface>
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <>
+      <FlatList
+        data={photos}
+        renderItem={renderPhotoItem}
+        keyExtractor={(item) => item.fileId.toString()}
+        numColumns={2}
+        contentContainerStyle={styles.gridContainer}
+        showsVerticalScrollIndicator={false}
+      />
+
+      {/* Modal para ver foto em tamanho completo */}
+      <Modal
+        visible={modalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closePhoto}
+      >
+        <View style={styles.modalContainer}>
+          <TouchableOpacity
+            style={styles.modalBackground}
+            activeOpacity={1}
+            onPress={closePhoto}
+          >
+            <View style={styles.modalContent}>
+              {selectedPhoto && (
+                <ScrollView
+                  contentContainerStyle={styles.modalScrollContent}
+                  showsVerticalScrollIndicator={false}
+                  bounces={false}
+                >
+                  {/* Botão Fechar */}
+                  <Surface style={styles.closeButtonContainer} elevation={4}>
+                    <IconButton
+                      icon="close"
+                      size={28}
+                      iconColor={colors.white}
+                      onPress={closePhoto}
+                      style={styles.closeButton}
+                    />
+                  </Surface>
+
+                  {/* Imagem em tamanho completo */}
+                  <TouchableOpacity activeOpacity={1}>
+                    <Image
+                      source={{
+                        uri: reportPhotosAPI.getPhotoUrl(selectedPhoto.hash),
+                      }}
+                      style={styles.fullImage}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+
+                  {/* Informações da foto */}
+                  <Surface style={styles.photoInfoContainer} elevation={3}>
+                    {selectedPhoto.description && (
+                      <View style={styles.infoRow}>
+                        <Text variant="labelMedium" style={styles.infoLabel}>
+                          Descrição:
+                        </Text>
+                        <Text variant="bodyMedium" style={styles.infoValue}>
+                          {selectedPhoto.description}
+                        </Text>
+                      </View>
+                    )}
+
+                    <View style={styles.infoRow}>
+                      <Text variant="labelMedium" style={styles.infoLabel}>
+                        Nome:
+                      </Text>
+                      <Text
+                        variant="bodySmall"
+                        style={styles.infoValue}
+                        numberOfLines={1}
+                      >
+                        {selectedPhoto.name}
+                      </Text>
+                    </View>
+
+                    <View style={styles.infoRow}>
+                      <Text variant="labelMedium" style={styles.infoLabel}>
+                        Data:
+                      </Text>
+                      <Text variant="bodySmall" style={styles.infoValue}>
+                        {formatDate(selectedPhoto.createDate)}
+                      </Text>
+                    </View>
+
+                    <View style={styles.infoRow}>
+                      <Text variant="labelMedium" style={styles.infoLabel}>
+                        Tamanho:
+                      </Text>
+                      <Text variant="bodySmall" style={styles.infoValue}>
+                        {formatFileSize(selectedPhoto.size)}
+                      </Text>
+                    </View>
+                  </Surface>
+                </ScrollView>
               )}
             </View>
-
-            {selectedPhoto && selectedPhoto.uri && (
-              <Image
-                source={{ uri: selectedPhoto.uri }}
-                style={styles.previewImage}
-                resizeMode="contain"
-              />
-            )}
-
-            {selectedPhoto && (
-              <View style={styles.photoInfo}>
-                <Text style={styles.photoInfoText}>
-                  {new Date(selectedPhoto.timestamp).toLocaleString('pt-PT')}
-                </Text>
-                {selectedPhoto.isUploaded && (
-                  <Text style={styles.uploadedText}>✓ Enviada</Text>
-                )}
-                {selectedPhoto.isOffline && !selectedPhoto.isUploaded && (
-                  <Text style={styles.offlineText}>📤 Pendente</Text>
-                )}
-              </View>
-            )}
-          </View>
-        </Modal>
-      </Portal>
-    </View>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+    </>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  loadingContainer: {
+    padding: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: spacing.md,
+    color: colors.textSecondary,
+  },
+  emptyContainer: {
+    padding: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    marginTop: spacing.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  gridContainer: {
+    padding: spacing.xs,
+  },
+  photoThumbnailContainer: {
     flex: 1,
+    margin: spacing.xs,
+    maxWidth: THUMBNAIL_SIZE,
   },
-  header: {
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  title: {
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  scrollContent: {
-    padding: spacing.md,
-    paddingBottom: 100,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-start',
-  },
-  photoContainer: {
-    width: PHOTO_SIZE,
-    height: PHOTO_SIZE,
-    margin: spacing.xs / 2,
+  photoThumbnail: {
+    width: THUMBNAIL_SIZE,
+    height: THUMBNAIL_SIZE,
     borderRadius: 8,
     overflow: 'hidden',
-    position: 'relative',
-    backgroundColor: colors.surfaceVariant,
+    backgroundColor: colors.lightGray,
   },
-  photo: {
+  thumbnailImage: {
     width: '100%',
     height: '100%',
   },
-  statusBadge: {
+  photoOverlay: {
     position: 'absolute',
-    top: 4,
-    right: 4,
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: spacing.xs,
   },
-  uploadedBadge: {
-    backgroundColor: colors.success + '99',
-  },
-  statusText: {
-    fontSize: 12,
+  photoDescription: {
     color: colors.white,
+    fontSize: 11,
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: spacing.xl * 2,
-    minHeight: 200,
-  },
-  emptyText: {
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-    textAlign: 'center',
-  },
-  emptySubtext: {
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  fab: {
-    position: 'absolute',
-    right: spacing.md,
-    bottom: spacing.md,
-    backgroundColor: colors.primary,
-  },
-  // Modal styles
   modalContainer: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.95)',
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 40,
-    paddingHorizontal: spacing.sm,
-  },
-  modalTitle: {
-    color: colors.white,
+  modalBackground: {
     flex: 1,
-    textAlign: 'center',
   },
-  previewImage: {
+  modalContent: {
     flex: 1,
-    width: '100%',
   },
-  photoInfo: {
+  modalScrollContent: {
+    flexGrow: 1,
+  },
+  closeButtonContainer: {
+    position: 'absolute',
+    top: 40,
+    right: spacing.md,
+    zIndex: 10,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  closeButton: {
+    margin: 0,
+  },
+  fullImage: {
+    width: width,
+    height: height * 0.7,
+    marginTop: 60,
+  },
+  photoInfoContainer: {
+    margin: spacing.md,
     padding: spacing.md,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    borderRadius: 12,
+    backgroundColor: colors.white,
   },
-  photoInfoText: {
-    color: colors.white,
-    fontSize: 14,
+  infoRow: {
+    marginBottom: spacing.sm,
   },
-  uploadedText: {
-    color: colors.success,
-    fontSize: 14,
+  infoLabel: {
     fontWeight: 'bold',
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
   },
-  offlineText: {
-    color: colors.warning,
-    fontSize: 14,
+  infoValue: {
+    color: colors.text,
   },
 });

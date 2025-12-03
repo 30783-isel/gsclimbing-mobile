@@ -3,8 +3,6 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  Image,
-  Dimensions,
 } from 'react-native';
 import {
   Text,
@@ -18,11 +16,10 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { colors, spacing } from '@/constants/theme';
 import { defectInspectionReportAPI } from '@/reports/defectInspectionReport/defectInspectionReport.api';
+import { reportPhotosAPI, type ReportPhotoData } from '@/services/api/reportPhotos.api';
 import type { DefectInspectionReportResponse } from '@/reports/defectInspectionReport/defectInspectionReport.types';
+import { PhotoGallery } from '@/components/PhotoGallery';
 import Toast from 'react-native-toast-message';
-
-const { width } = Dimensions.get('window');
-const PHOTO_SIZE = (width - spacing.md * 3) / 2;
 
 export default function DefectInspectionReportViewScreen() {
   const router = useRouter();
@@ -32,10 +29,10 @@ export default function DefectInspectionReportViewScreen() {
     projectName: string;
   }>();
 
-  const [report, setReport] = useState<DefectInspectionReportResponse | null>(
-    null
-  );
+  const [report, setReport] = useState<DefectInspectionReportResponse | null>(null);
+  const [photos, setPhotos] = useState<ReportPhotoData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingPhotos, setIsLoadingPhotos] = useState(false);
 
   useEffect(() => {
     loadReport();
@@ -47,9 +44,14 @@ export default function DefectInspectionReportViewScreen() {
       console.log('📄 Carregando relatório:', reportId);
 
       const data = await defectInspectionReportAPI.getById(Number(reportId));
-
       setReport(data);
+      
       console.log('✅ Relatório carregado');
+
+      // Carregar fotos se existirem
+      if (data.numberPictures > 0) {
+        loadPhotos(Number(reportId));
+      }
     } catch (error: any) {
       console.error('❌ Erro ao carregar relatório:', error);
       Toast.show({
@@ -59,6 +61,27 @@ export default function DefectInspectionReportViewScreen() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadPhotos = async (reportId: number) => {
+    try {
+      setIsLoadingPhotos(true);
+      console.log('📸 Carregando fotografias do relatório:', reportId);
+
+      const photoData = await reportPhotosAPI.getPhotos(reportId);
+      setPhotos(photoData);
+
+      console.log(`✅ ${photoData.length} fotografias carregadas`);
+    } catch (error: any) {
+      console.error('❌ Erro ao carregar fotografias:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Erro',
+        text2: 'Erro ao carregar fotografias',
+      });
+    } finally {
+      setIsLoadingPhotos(false);
     }
   };
 
@@ -197,11 +220,11 @@ export default function DefectInspectionReportViewScreen() {
           </Card.Content>
         </Card>
 
-        {/* Fotos */}
+        {/* Fotos - NOVA GALERIA */}
         {report.numberPictures > 0 && (
           <Card style={styles.card} mode="elevated">
             <Card.Title
-              title={`Fotos (${report.numberPictures})`}
+              title={`Fotografias (${report.numberPictures})`}
               left={(props) => (
                 <IconButton
                   {...props}
@@ -211,15 +234,7 @@ export default function DefectInspectionReportViewScreen() {
               )}
             />
             <Card.Content>
-              <View style={styles.photosContainer}>
-                <Text variant="bodyMedium" style={styles.photosPlaceholder}>
-                  📸 Este relatório contém {report.numberPictures}{' '}
-                  {report.numberPictures === 1 ? 'foto' : 'fotos'}
-                </Text>
-                <Text variant="bodySmall" style={styles.photosHint}>
-                  (Visualização de fotos será implementada em breve)
-                </Text>
-              </View>
+              <PhotoGallery photos={photos} isLoading={isLoadingPhotos} />
             </Card.Content>
           </Card>
         )}
@@ -354,20 +369,6 @@ const styles = StyleSheet.create({
   },
   divider: {
     marginVertical: spacing.md,
-  },
-  photosContainer: {
-    alignItems: 'center',
-    padding: spacing.lg,
-  },
-  photosPlaceholder: {
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: spacing.sm,
-  },
-  photosHint: {
-    color: colors.lightGray,
-    textAlign: 'center',
-    fontStyle: 'italic',
   },
   statsContainer: {
     flexDirection: 'row',
