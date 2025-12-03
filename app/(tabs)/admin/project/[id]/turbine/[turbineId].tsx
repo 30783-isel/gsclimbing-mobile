@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Text, Card, IconButton, FAB, Portal, Dialog, Button, Chip } from 'react-native-paper';
+import { Text, Card, IconButton, Portal, Dialog, Button, Chip } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { projectsAPI } from '@/services/api/projects.api';
@@ -14,20 +14,23 @@ export default function TurbineDetailsScreen() {
   const { t } = useTranslation();
 
   const [turbine, setTurbine] = useState<Turbine | null>(null);
+  const [project, setProject] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
 
   useEffect(() => {
-    loadTurbine();
-  }, [turbineId]);
+    loadData();
+  }, [turbineId, id]);
 
-  const loadTurbine = async () => {
+  const loadData = async () => {
     try {
       setIsLoading(true);
-      const data = await projectsAPI.getTurbineById(turbineId);
-      setTurbine(data);
+      const turbineData = await projectsAPI.getTurbineById(turbineId);
+      const projectData = await projectsAPI.getById(Number(id));
+      setTurbine(turbineData);
+      setProject(projectData);
     } catch (error) {
-      console.error('Error loading turbine:', error);
+      console.error('Error loading data:', error);
     } finally {
       setIsLoading(false);
     }
@@ -38,7 +41,7 @@ export default function TurbineDetailsScreen() {
   };
 
   const handleEdit = () => {
-    router.push(`/(tabs)/admin/project/${id}/turbine/${turbineId}/edit`);
+    router.push(`/(tabs)/admin/project/${id}/turbine/${turbineId}/edit` as any);
   };
 
   const handleDelete = async () => {
@@ -52,22 +55,84 @@ export default function TurbineDetailsScreen() {
   };
 
   const handleCreateReport = (reportType: ReportType) => {
-    router.push({
-      pathname: `/(tabs)/admin/project/${id}/turbine/${turbineId}/report/create` as any,
-      params: { type: reportType.toString() },
-    });
+    // Navegar para o relatório apropriado baseado no tipo
+    if (reportType === ReportType.DEFECT_INSPECTION) {
+      router.push({
+        pathname: '/(tabs)/admin/reports/defect-inspection' as any,
+        params: {
+          projectoId: id,
+          turbinaId: turbineId,
+          projectName: project?.name || 'Projeto',
+          turbineName: turbine?.name || 'Turbina',
+        },
+      });
+    } else {
+      // Para outros tipos, usar rota genérica (implementar depois)
+      router.push({
+        pathname: `/(tabs)/admin/project/${id}/turbine/${turbineId}/report/create` as any,
+        params: { type: reportType.toString() },
+      });
+    }
   };
 
   // Map dos relatórios disponíveis
   const reportAvailability = turbine ? [
-    { type: ReportType.DEFECT_INSPECTION, available: turbine.defectsInspectionReport, name: 'Defect Inspection' },
-    { type: ReportType.EXAMINATION_TRANSFORMER, available: turbine.examinationTransformer, name: 'Examination Transformer' },
-    { type: ReportType.MEASUREMENTS_6KV, available: turbine.measurements6KV, name: 'Measurements 6KV' },
-    { type: ReportType.MEASUREMENTS_690V400V, available: turbine.measurements690V400V, name: 'Measurements 690V/400V' },
-    { type: ReportType.MEASUREMENTS_MV_SWITCHGEAR, available: turbine.measurementsMwSwitchgear, name: 'Measurements MV Switchgear' },
-    { type: ReportType.ONBOARD_CRANE, available: turbine.onboardCraneInspectionReport, name: 'Onboard Crane' },
-    { type: ReportType.PERFORMANCE_REPAIR_ELEVATOR, available: turbine.performanceReportRepairElevator, name: 'Performance Repair Elevator' },
-    { type: ReportType.STATUTORY_INSPECTION, available: turbine.statutoryInspectionReport, name: 'Statutory Inspection' },
+    { 
+      type: ReportType.DEFECT_INSPECTION, 
+      available: turbine.defectsInspectionReport, 
+      name: REPORT_TYPE_NAMES[ReportType.DEFECT_INSPECTION],
+      icon: 'alert-circle-outline',
+      color: '#F44336',
+    },
+    { 
+      type: ReportType.EXAMINATION_TRANSFORMER, 
+      available: turbine.examinationTransformer, 
+      name: REPORT_TYPE_NAMES[ReportType.EXAMINATION_TRANSFORMER],
+      icon: 'flash',
+      color: '#FF9800',
+    },
+    { 
+      type: ReportType.MEASUREMENTS_6KV, 
+      available: turbine.measurements6KV, 
+      name: REPORT_TYPE_NAMES[ReportType.MEASUREMENTS_6KV],
+      icon: 'chart-line',
+      color: '#3F51B5',
+    },
+    { 
+      type: ReportType.MEASUREMENTS_690V400V, 
+      available: turbine.measurements690V400V, 
+      name: REPORT_TYPE_NAMES[ReportType.MEASUREMENTS_690V400V],
+      icon: 'sine-wave',
+      color: '#2196F3',
+    },
+    { 
+      type: ReportType.MEASUREMENTS_MV_SWITCHGEAR, 
+      available: turbine.measurementsMwSwitchgear, 
+      name: REPORT_TYPE_NAMES[ReportType.MEASUREMENTS_MV_SWITCHGEAR],
+      icon: 'speedometer',
+      color: '#9C27B0',
+    },
+    { 
+      type: ReportType.ONBOARD_CRANE, 
+      available: turbine.onboardCraneInspectionReport, 
+      name: REPORT_TYPE_NAMES[ReportType.ONBOARD_CRANE],
+      icon: 'crane',
+      color: '#009688',
+    },
+    { 
+      type: ReportType.PERFORMANCE_REPAIR_ELEVATOR, 
+      available: turbine.performanceReportRepairElevator, 
+      name: REPORT_TYPE_NAMES[ReportType.PERFORMANCE_REPAIR_ELEVATOR],
+      icon: 'elevator',
+      color: '#4CAF50',
+    },
+    { 
+      type: ReportType.STATUTORY_INSPECTION, 
+      available: turbine.statutoryInspectionReport, 
+      name: REPORT_TYPE_NAMES[ReportType.STATUTORY_INSPECTION],
+      icon: 'file-document-outline',
+      color: '#607D8B',
+    },
   ] : [];
 
   if (isLoading || !turbine) {
@@ -134,7 +199,7 @@ export default function TurbineDetailsScreen() {
 
             {turbine.number && (
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Número WTG:</Text>
+                <Text style={styles.detailLabel}>Número:</Text>
                 <Text style={styles.detailValue}>{turbine.number}</Text>
               </View>
             )}
@@ -148,7 +213,7 @@ export default function TurbineDetailsScreen() {
 
             {turbine.year && (
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Ano de Construção:</Text>
+                <Text style={styles.detailLabel}>Ano:</Text>
                 <Text style={styles.detailValue}>{turbine.year}</Text>
               </View>
             )}
@@ -156,17 +221,17 @@ export default function TurbineDetailsScreen() {
         </Card>
 
         {/* Reports Section */}
-        <View style={styles.reportsSection}>
-          <Text variant="titleMedium" style={styles.sectionTitleWithMargin}>
-            Tipos de Relatórios
-          </Text>
+        <Text variant="titleMedium" style={styles.reportsTitle}>
+          Tipos de Relatórios
+        </Text>
 
+        <View style={styles.reportsList}>
           {reportAvailability.map((report) => (
             <TouchableOpacity
               key={report.type}
-              onPress={() => report.available && handleCreateReport(report.type)}
-              activeOpacity={0.7}
+              onPress={() => handleCreateReport(report.type)}
               disabled={!report.available}
+              activeOpacity={0.7}
             >
               <Card
                 style={[
@@ -174,90 +239,63 @@ export default function TurbineDetailsScreen() {
                   !report.available && styles.reportCardDisabled,
                 ]}
               >
-                <Card.Content>
-                  <View style={styles.reportCardContent}>
-                    <View style={styles.reportInfo}>
-                      <Text
-                        variant="titleSmall"
-                        style={[
-                          styles.reportName,
-                          !report.available && styles.reportNameDisabled,
-                        ]}
-                      >
-                        {report.name}
-                      </Text>
+                <Card.Content style={styles.reportCardContent}>
+                  <View
+                    style={[
+                      styles.reportIcon,
+                      { backgroundColor: report.available ? report.color : colors.disabled },
+                    ]}
+                  >
+                    <IconButton
+                      icon={report.icon}
+                      size={28}
+                      iconColor="#fff"
+                    />
+                  </View>
+
+                  <View style={styles.reportInfo}>
+                    <Text
+                      variant="titleSmall"
+                      style={[
+                        styles.reportName,
+                        !report.available && styles.reportNameDisabled,
+                      ]}
+                      numberOfLines={2}
+                    >
+                      {report.name}
+                    </Text>
+                    {!report.available && (
                       <Chip
-                        icon={report.available ? 'check-circle' : 'close-circle'}
-                        style={[
-                          styles.statusChip,
-                          report.available ? styles.statusChipAvailable : styles.statusChipUnavailable,
-                        ]}
-                        textStyle={styles.statusChipText}
+                        icon="close-circle"
+                        style={styles.unavailableChip}
+                        textStyle={styles.unavailableChipText}
                       >
-                        {report.available ? 'Disponível' : 'Indisponível'}
+                        Não disponível
                       </Chip>
-                    </View>
-                    {report.available && (
-                      <IconButton
-                        icon="chevron-right"
-                        size={24}
-                        iconColor={colors.primary}
-                      />
                     )}
                   </View>
+
+                  {report.available && (
+                    <IconButton
+                      icon="chevron-right"
+                      size={24}
+                      iconColor={colors.textSecondary}
+                    />
+                  )}
                 </Card.Content>
               </Card>
             </TouchableOpacity>
           ))}
         </View>
-
-        {/* Statistics */}
-        <Card style={styles.statsCard}>
-          <Card.Content>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
-              Estatísticas
-            </Text>
-
-            <View style={styles.statsGrid}>
-              <View style={styles.statBox}>
-                <Text variant="headlineSmall" style={styles.statNumber}>
-                  {reportAvailability.filter((r) => r.available).length}
-                </Text>
-                <Text variant="bodySmall" style={styles.statLabel}>
-                  Disponíveis
-                </Text>
-              </View>
-
-              <View style={styles.statBox}>
-                <Text variant="headlineSmall" style={styles.statNumber}>
-                  {reportAvailability.filter((r) => !r.available).length}
-                </Text>
-                <Text variant="bodySmall" style={styles.statLabel}>
-                  Indisponíveis
-                </Text>
-              </View>
-            </View>
-          </Card.Content>
-        </Card>
       </ScrollView>
 
-      {/* FAB - Quick Actions */}
-      <FAB
-        icon="file-document-plus"
-        label="Novo Relatório"
-        style={styles.fab}
-        onPress={() => {}}
-        color="#fff"
-      />
-
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Dialog */}
       <Portal>
         <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)}>
           <Dialog.Title>Eliminar Turbina</Dialog.Title>
           <Dialog.Content>
-            <Text>Tem a certeza que deseja eliminar a turbina "{turbine.name}"?</Text>
-            <Text style={{ marginTop: 8, color: colors.error }}>
-              Esta ação não pode ser desfeita.
+            <Text variant="bodyMedium">
+              Tem a certeza que deseja eliminar esta turbina? Esta ação não pode ser desfeita.
             </Text>
           </Dialog.Content>
           <Dialog.Actions>
@@ -281,17 +319,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.background,
   },
   header: {
+    backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primary,
-    paddingTop: 40,
-    paddingBottom: spacing.md,
+    paddingVertical: spacing.md,
     paddingHorizontal: spacing.xs,
+    elevation: 4,
   },
   headerCenter: {
     flex: 1,
+    alignItems: 'center',
   },
   headerTitle: {
     color: colors.white,
@@ -300,28 +340,22 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     color: colors.white,
     opacity: 0.8,
-    marginTop: spacing.xs / 2,
   },
   headerActions: {
     flexDirection: 'row',
   },
   content: {
     flex: 1,
+    padding: spacing.md,
   },
   infoCard: {
-    margin: spacing.md,
+    marginBottom: spacing.lg,
     elevation: 2,
   },
   sectionTitle: {
-    fontWeight: 'bold',
+    color: colors.primary,
     marginBottom: spacing.md,
-    color: colors.text,
-  },
-  sectionTitleWithMargin: {
     fontWeight: 'bold',
-    marginBottom: spacing.md,
-    marginHorizontal: spacing.md,
-    color: colors.text,
   },
   detailRow: {
     flexDirection: 'row',
@@ -331,19 +365,21 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   detailLabel: {
+    fontWeight: '600',
     color: colors.textSecondary,
-    fontSize: 14,
   },
   detailValue: {
     color: colors.text,
-    fontSize: 14,
-    fontWeight: '500',
   },
-  reportsSection: {
-    marginTop: spacing.md,
+  reportsTitle: {
+    color: colors.primary,
+    marginBottom: spacing.md,
+    fontWeight: 'bold',
+  },
+  reportsList: {
+    gap: spacing.sm,
   },
   reportCard: {
-    marginHorizontal: spacing.md,
     marginBottom: spacing.sm,
     elevation: 2,
   },
@@ -352,8 +388,16 @@ const styles = StyleSheet.create({
   },
   reportCardContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  reportIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
   },
   reportInfo: {
     flex: 1,
@@ -361,52 +405,17 @@ const styles = StyleSheet.create({
   reportName: {
     fontWeight: '600',
     marginBottom: spacing.xs,
-    color: colors.text,
   },
   reportNameDisabled: {
     color: colors.textSecondary,
   },
-  statusChip: {
+  unavailableChip: {
     alignSelf: 'flex-start',
+    backgroundColor: colors.errorLight,
+    height: 24,
   },
-  statusChipAvailable: {
-    backgroundColor: colors.success + '20',
-  },
-  statusChipUnavailable: {
-    backgroundColor: colors.error + '20',
-  },
-  statusChipText: {
+  unavailableChipText: {
     fontSize: 11,
-  },
-  statsCard: {
-    margin: spacing.md,
-    marginTop: spacing.lg,
-    elevation: 2,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  statBox: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    padding: spacing.md,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  statNumber: {
-    color: colors.primary,
-    fontWeight: 'bold',
-  },
-  statLabel: {
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-  },
-  fab: {
-    position: 'absolute',
-    margin: spacing.md,
-    right: 0,
-    bottom: 0,
-    backgroundColor: colors.primary,
+    color: colors.error,
   },
 });

@@ -1,5 +1,6 @@
 import httpClient from '../httpClient';
 import { API_CONFIG } from '@/constants/api';
+import { ReportType } from '@/types';
 import type { Project, CreateProjectDTO, UpdateProjectDTO, ProjectFilters } from '@/types/project.types';
 import type { Turbine } from '@/types/turbine.types';
 
@@ -81,6 +82,16 @@ export const projectsAPI = {
     );
     return response.data;
   },
+
+    /**
+   * Obter projeto por ID
+   */
+  getProjectById: async (idProject: string): Promise<ReportType> => {
+  const response = await httpClient.get(
+    `${API_CONFIG.baseProjectsUrl}project-by-id/${idProject}`
+  );
+  return response.data;
+},
 
   /**
    * Obter turbina por ID

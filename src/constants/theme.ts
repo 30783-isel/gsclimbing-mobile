@@ -13,6 +13,7 @@ export const colors = {
   
   // Status colors
   error: '#d32f2f',
+  errorLight: '#ef9a9a',
   success: '#4caf50',
   warning: '#ff9800',
   info: '#2196f3',
@@ -44,6 +45,8 @@ export const colors = {
   // Card colors
   cardBackground: '#ffffff',
   cardShadow: 'rgba(0, 0, 0, 0.1)',
+
+  disabled: '#cccccc',
 };
 
 // Light Theme (padrão)
