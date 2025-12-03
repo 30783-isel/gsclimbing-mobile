@@ -5,4 +5,4 @@
  * Acessível via: /(tabs)/admin/reports/defect-inspection
  */
 
-export { default } from '@/screens/reports/DefectInspectionReportScreen';
+export { default } from '@/screens/reports/defect-inspection/DefectInspectionReportScreen';

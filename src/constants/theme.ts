@@ -37,6 +37,8 @@ export const colors = {
   white: '#ffffff',
   black: '#000000',
   transparent: 'transparent',
+  lightGray: '#bdbdbd',
+  accent: '#009688',
   
   // Overlay colors
   overlay: 'rgba(0, 0, 0, 0.5)',
@@ -220,4 +222,3 @@ export const opacity = {
   hint: 0.7,
   active: 1,
 };
-

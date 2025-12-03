@@ -33,6 +33,18 @@ export const defectInspectionReportAPI = {
   },
 
   /**
+   * Obter lista de relatórios de uma turbina
+   */
+  getByTurbineId: async (
+    turbineId: number
+  ): Promise<DefectInspectionReportResponse[]> => {
+    const response = await httpClient.get(
+      `${API_CONFIG.baseUrl}reports/mobile/defect-inspection/turbine/${turbineId}`
+    );
+    return response.data;
+  },
+
+  /**
    * Atualizar relatório
    */
   update: async (

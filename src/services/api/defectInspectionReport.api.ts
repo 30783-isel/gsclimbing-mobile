@@ -1,9 +1,9 @@
-import httpClient from '../httpClient';
+import httpClient from '@/services/httpClient';
 import { API_CONFIG } from '@/constants/api';
 import type {
   DefectInspectionReportDTO,
   DefectInspectionReportResponse,
-} from '@/types/defectInspectionReport.types';
+} from '@/reports/defectInspectionReport/defectInspectionReport.types';
 
 /**
  * API para Defect Inspection Report
@@ -28,6 +28,18 @@ export const defectInspectionReportAPI = {
   getById: async (reportId: number): Promise<DefectInspectionReportResponse> => {
     const response = await httpClient.get(
       `${API_CONFIG.baseUrl}reports/mobile/defect-inspection/${reportId}`
+    );
+    return response.data;
+  },
+
+  /**
+   * Obter lista de relatórios de uma turbina
+   */
+  getByTurbineId: async (
+    turbineId: number
+  ): Promise<DefectInspectionReportResponse[]> => {
+    const response = await httpClient.get(
+      `${API_CONFIG.baseUrl}reports/mobile/defect-inspection/turbine/${turbineId}`
     );
     return response.data;
   },
