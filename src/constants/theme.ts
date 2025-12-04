@@ -18,6 +18,8 @@ export const colors = {
   warning: '#ff9800',
   info: '#2196f3',
   
+  divider: '#000000',
+  
   // Background colors
   background: '#ffffff',
   surface: '#f7f7f7',

@@ -59,6 +59,13 @@ export default function DefectInspectionReportsListScreen() {
     }
   };
 
+  const handleEditReport = (reportId: number) => {
+    router.push({
+      pathname: '/(tabs)/admin/reports/defect-inspection/edit' as any,
+      params: { reportId: reportId.toString() },
+    });
+  };
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await loadReports();

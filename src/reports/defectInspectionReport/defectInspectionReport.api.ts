@@ -59,36 +59,67 @@ export const defectInspectionReportAPI = {
   },
 
   /**
-   * Upload de foto (usa endpoint existente)
+   * Upload de foto (VERSÃO CORRIGIDA)
+   * Usa UUID do relatório e FormData correto
    */
   uploadPhoto: async (
-    reportId: string,
+    reportUuid: string,
     photoUri: string,
     description: string
   ): Promise<{ fileId: string; success: boolean }> => {
-    const formData = new FormData();
-    
-    // Extrair nome do arquivo da URI
-    const filename = photoUri.split('/').pop() || 'photo.jpg';
-    
-    formData.append('file', {
-      uri: photoUri,
-      type: 'image/jpeg',
-      name: filename,
-    } as any);
-    
-    formData.append('description', description);
-
-    const response = await httpClient.post(
-      `${API_CONFIG.baseFilesUrl}upload/${reportId}`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+    try {
+      console.log('📸 Preparando upload de foto...');
+      console.log('   Report UUID:', reportUuid);
+      console.log('   Photo URI:', photoUri.substring(0, 100) + '...');
+      
+      const formData = new FormData();
+      const filename = photoUri.split('/').pop() || 'photo.jpg';
+      
+      // Converter para Blob
+      if (photoUri.startsWith('data:')) {
+        // Data URL (Web) - converter para Blob
+        const response = await fetch(photoUri);
+        const blob = await response.blob();
+        console.log('   Blob criado:', blob.type, blob.size, 'bytes');
+        // Usar Blob diretamente com cast para any
+        (formData as any).append('file', blob, filename);
+      } else if (photoUri.startsWith('http')) {
+        // URL remota
+        const response = await fetch(photoUri);
+        const blob = await response.blob();
+        console.log('   Blob criado:', blob.type, blob.size, 'bytes');
+        (formData as any).append('file', blob, filename);
+      } else {
+        // React Native formato
+        const file = {
+          uri: photoUri,
+          type: 'image/jpeg',
+          name: filename,
+        } as any;
+        formData.append('file', file);
       }
-    );
-    
-    return response.data;
+      
+      formData.append('description', description || '');
+
+      console.log('📤 Enviando foto para:', `${API_CONFIG.baseFilesUrl}upload/${reportUuid}`);
+
+      const response = await httpClient.post(
+        `${API_CONFIG.baseFilesUrl}upload/${reportUuid}`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+      
+      console.log('✅ Upload bem-sucedido:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Erro no upload de foto:', error);
+      console.error('   Status:', error.response?.status);
+      console.error('   Data:', error.response?.data);
+      throw error;
+    }
   },
 };

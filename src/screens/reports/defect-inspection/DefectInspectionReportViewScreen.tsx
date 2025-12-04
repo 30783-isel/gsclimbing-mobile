@@ -89,6 +89,16 @@ export default function DefectInspectionReportViewScreen() {
     router.back();
   };
 
+  // ✅ NOVA FUNÇÃO: Navegar para edição
+  const handleEdit = () => {
+    router.push({
+      pathname: '/(tabs)/admin/reports/defect-inspection/edit' as any,
+      params: {
+        reportId: reportId.toString(),
+      },
+    });
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString('pt-PT', {
@@ -129,7 +139,7 @@ export default function DefectInspectionReportViewScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header com Botão de Editar */}
       <Surface style={styles.header} elevation={2}>
         <IconButton
           icon="arrow-left"
@@ -145,7 +155,13 @@ export default function DefectInspectionReportViewScreen() {
             {turbineName} - {projectName}
           </Text>
         </View>
-        <View style={{ width: 48 }} />
+        {/* ✅ BOTÃO DE EDITAR */}
+        <IconButton
+          icon="pencil"
+          size={24}
+          iconColor={colors.white}
+          onPress={handleEdit}
+        />
       </Surface>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -202,42 +218,23 @@ export default function DefectInspectionReportViewScreen() {
 
             <View style={styles.infoRow}>
               <Text variant="bodyMedium" style={styles.infoLabel}>
-                Data de Criação:
-              </Text>
-              <Text variant="bodyMedium" style={styles.infoValue}>
-                {formatDate(report.createDate)}
-              </Text>
-            </View>
-
-            <View style={styles.infoRow}>
-              <Text variant="bodyMedium" style={styles.infoLabel}>
                 UUID:
               </Text>
               <Text variant="bodySmall" style={styles.infoValueSmall}>
                 {report.uuid}
               </Text>
             </View>
+
+            <View style={styles.infoRow}>
+              <Text variant="bodyMedium" style={styles.infoLabel}>
+                Data de Criação:
+              </Text>
+              <Text variant="bodyMedium" style={styles.infoValue}>
+                {formatDate(report.createDate)}
+              </Text>
+            </View>
           </Card.Content>
         </Card>
-
-        {/* Fotos - NOVA GALERIA */}
-        {report.numberPictures > 0 && (
-          <Card style={styles.card} mode="elevated">
-            <Card.Title
-              title={`Fotografias (${report.numberPictures})`}
-              left={(props) => (
-                <IconButton
-                  {...props}
-                  icon="image-multiple"
-                  iconColor={colors.primary}
-                />
-              )}
-            />
-            <Card.Content>
-              <PhotoGallery photos={photos} isLoading={isLoadingPhotos} />
-            </Card.Content>
-          </Card>
-        )}
 
         {/* Estatísticas */}
         <Card style={styles.card} mode="elevated">
@@ -254,37 +251,84 @@ export default function DefectInspectionReportViewScreen() {
           <Card.Content>
             <View style={styles.statsContainer}>
               <View style={styles.statItem}>
-                <Chip
-                  icon="identifier"
-                  style={[styles.statChip, { backgroundColor: colors.primary }]}
-                  textStyle={{ color: colors.white }}
+                <Chip 
+                  icon="image-multiple" 
+                  mode="outlined"
+                  style={styles.statChip}
                 >
-                  ID: {report.reportId}
+                  {report.numberPictures} {report.numberPictures === 1 ? 'Foto' : 'Fotos'}
                 </Chip>
               </View>
-
               <View style={styles.statItem}>
-                <Chip
-                  icon="turbine"
-                  style={[styles.statChip, { backgroundColor: colors.secondary }]}
-                  textStyle={{ color: colors.white }}
+                <Chip 
+                  icon="turbine" 
+                  mode="outlined"
+                  style={styles.statChip}
                 >
-                  Projeto: {report.projectoId}
+                  Turbina #{report.turbinaId}
                 </Chip>
               </View>
-
               <View style={styles.statItem}>
-                <Chip
-                  icon="wind-turbine"
-                  style={[styles.statChip, { backgroundColor: colors.accent }]}
-                  textStyle={{ color: colors.white }}
+                <Chip 
+                  icon="folder" 
+                  mode="outlined"
+                  style={styles.statChip}
                 >
-                  Turbina: {report.turbinaId}
+                  Projeto #{report.projectoId}
                 </Chip>
               </View>
             </View>
           </Card.Content>
         </Card>
+
+        {/* Fotografias */}
+        {isLoadingPhotos ? (
+          <Card style={styles.card} mode="elevated">
+            <Card.Content>
+              <View style={styles.loadingPhotosContainer}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.loadingPhotosText}>
+                  A carregar fotografias...
+                </Text>
+              </View>
+            </Card.Content>
+          </Card>
+        ) : photos.length > 0 ? (
+          <Card style={styles.card} mode="elevated">
+            <Card.Title
+              title="Fotografias"
+              subtitle={`${photos.length} ${photos.length === 1 ? 'fotografia' : 'fotografias'}`}
+              left={(props) => (
+                <IconButton
+                  {...props}
+                  icon="image-multiple-outline"
+                  iconColor={colors.primary}
+                />
+              )}
+            />
+            <Card.Content>
+              <PhotoGallery photos={photos} />
+            </Card.Content>
+          </Card>
+        ) : report.numberPictures > 0 ? (
+          <Card style={styles.card} mode="elevated">
+            <Card.Content>
+              <View style={styles.noPhotosContainer}>
+                <IconButton
+                  icon="alert-circle-outline"
+                  size={48}
+                  iconColor={colors.warning}
+                />
+                <Text variant="bodyMedium" style={styles.noPhotosText}>
+                  Erro ao carregar fotografias
+                </Text>
+              </View>
+            </Card.Content>
+          </Card>
+        ) : null}
+
+        {/* Espaço no final */}
+        <View style={styles.bottomSpacer} />
       </ScrollView>
     </View>
   );
@@ -380,5 +424,26 @@ const styles = StyleSheet.create({
   },
   statChip: {
     marginBottom: spacing.xs,
+  },
+  loadingPhotosContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.lg,
+  },
+  loadingPhotosText: {
+    marginLeft: spacing.md,
+    color: colors.textSecondary,
+  },
+  noPhotosContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+  },
+  noPhotosText: {
+    marginTop: spacing.sm,
+    color: colors.textSecondary,
+  },
+  bottomSpacer: {
+    height: spacing.xl,
   },
 });
