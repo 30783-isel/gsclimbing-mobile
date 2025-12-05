@@ -25,10 +25,13 @@ export default function ProjectDetailsScreen() {
 
   const {
     loadTurbines,
+    deleteTurbine,
   } = useTurbines();
 
   const [activeTab, setActiveTab] = useState<'turbines' | 'reports' | 'historic'>('turbines');
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
+  const [deleteTurbineDialogVisible, setDeleteTurbineDialogVisible] = useState(false);
+  const [turbineToDelete, setTurbineToDelete] = useState<Turbine | null>(null);
   const [turbineSheetVisible, setTurbineSheetVisible] = useState(false);
   const [turbineSheetMode, setTurbineSheetMode] = useState<'create' | 'edit'>('create');
   const [selectedTurbine, setSelectedTurbine] = useState<Turbine | null>(null);
@@ -77,134 +80,109 @@ export default function ProjectDetailsScreen() {
     setTurbineSheetVisible(true);
   };
 
-const handleTurbineFormSubmit = async (data: any) => {
-  try {
-    console.log('🔍 Debug - Mode:', turbineSheetMode);
-    console.log('🔍 Debug - Data recebido:', data);
-    console.log('🔍 Debug - Selected Turbine:', selectedTurbine);
-    
-    if (turbineSheetMode === 'create') {
-      // ===== CRIAR NOVA TURBINA =====
-      if (!selectedProject) {
-        Alert.alert('Erro', 'Projeto não selecionado');
-        return;
-      }
-      
-      console.log('📝 Criando turbina no projeto:', selectedProject.name);
-      await projectsAPI.addTurbine(selectedProject.idProject);
-      
-      Toast.show({
-        type: 'success',
-        text1: 'Sucesso',
-        text2: 'Turbina criada com sucesso',
-      });
-      
-    } else {
-      // ===== ATUALIZAR TURBINA EXISTENTE =====
-      
-      // Validação 1: Verificar se turbina está selecionada
-      if (!selectedTurbine) {
-        console.error('❌ selectedTurbine é null ou undefined');
-        Alert.alert('Erro', 'Nenhuma turbina selecionada para editar');
-        return;
-      }
-      
-      // Validação 2: Verificar se tem ID
-      if (!selectedTurbine.id) {
-        console.error('❌ selectedTurbine.id não existe:', selectedTurbine);
-        Alert.alert('Erro', 'ID da turbina não encontrado');
-        return;
-      }
-      
-      console.log('📝 Atualizando turbina ID:', selectedTurbine.id);
-      
-      // Criar FormData com campos corretos
-      const formData = new FormData();
-      
-      // Campo obrigatório: turbineId
-      formData.append('turbineId', selectedTurbine.id.toString());
-      
-      // 8 flags booleanos (obrigatórios)
-      // Usar valores do data ou valores atuais da turbina como fallback
-      formData.append(
-        'defectsInspectionReport',
-        (data.defectsInspectionReport ?? selectedTurbine.defectsInspectionReport ?? false) ? 'true' : 'false'
-      );
-      formData.append(
-        'examinationTransformer',
-        (data.examinationTransformer ?? selectedTurbine.examinationTransformer ?? false) ? 'true' : 'false'
-      );
-      formData.append(
-        'measurements6KV',
-        (data.measurements6KV ?? selectedTurbine.measurements6KV ?? false) ? 'true' : 'false'
-      );
-      formData.append(
-        'measurements690V400V',
-        (data.measurements690V400V ?? selectedTurbine.measurements690V400V ?? false) ? 'true' : 'false'
-      );
-      formData.append(
-        'measurementsMwSwitchgear',
-        (data.measurementsMwSwitchgear ?? selectedTurbine.measurementsMwSwitchgear ?? false) ? 'true' : 'false'
-      );
-      formData.append(
-        'onboardCraneInspectionReport',
-        (data.onboardCraneInspectionReport ?? selectedTurbine.onboardCraneInspectionReport ?? false) ? 'true' : 'false'
-      );
-      formData.append(
-        'performanceReportRepairElevator',
-        (data.performanceReportRepairElevator ?? selectedTurbine.performanceReportRepairElevator ?? false) ? 'true' : 'false'
-      );
-      formData.append(
-        'statutoryInspectionReport',
-        (data.statutoryInspectionReport ?? selectedTurbine.statutoryInspectionReport ?? false) ? 'true' : 'false'
-      );
-      
-      // Debug: Mostrar FormData
-      console.log('📦 FormData criado:');
-      console.log('  - turbineId:', selectedTurbine.id);
-      console.log('  - defectsInspectionReport:', data.defectsInspectionReport ?? selectedTurbine.defectsInspectionReport);
-      console.log('  - examinationTransformer:', data.examinationTransformer ?? selectedTurbine.examinationTransformer);
-      // ... outros flags
-      
-      // Fazer request
-      await projectsAPI.updateTurbine(formData);
-      
-      console.log('✅ Turbina atualizada com sucesso');
-      
-      Toast.show({
-        type: 'success',
-        text1: 'Sucesso',
-        text2: 'Turbina atualizada com sucesso',
-      });
+  const handleDeleteTurbinePress = (turbine: Turbine, event: any) => {
+    event?.stopPropagation();
+    setTurbineToDelete(turbine);
+    setDeleteTurbineDialogVisible(true);
+  };
+
+  const handleDeleteTurbineConfirm = async () => {
+    if (!turbineToDelete) return;
+    try {
+      await deleteTurbine(turbineToDelete.id);
+      await loadTurbines(id);
+      setDeleteTurbineDialogVisible(false);
+      setTurbineToDelete(null);
+    } catch (error) {
+      console.error('Erro ao eliminar turbina:', error);
     }
-    
-    // Recarregar lista de turbinas
-    console.log('🔄 Recarregando lista de turbinas...');
-    await loadTurbines(id);
-    
-    // Fechar modal
-    setTurbineSheetVisible(false);
-    
-  } catch (error: any) {
-    console.error('❌ Erro ao submeter formulário:', error);
-    console.error('❌ Error details:', {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-    });
-    
-    const errorMessage = 
-      error.response?.data?.message || 
-      error.response?.data || 
-      error.message || 
-      'Erro desconhecido ao atualizar turbina';
-    
-    Alert.alert(
-      'Erro',
-      typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage)
-    );
-  }
-};
+  };
+
+  const handleTurbineFormSubmit = async (data: any) => {
+    try {
+      console.log('🔍 Debug - Mode:', turbineSheetMode);
+      console.log('🔍 Debug - Data recebido:', data);
+      console.log('🔍 Debug - Selected Turbine:', selectedTurbine);
+      
+      if (turbineSheetMode === 'create') {
+        console.log('📝 Modo: CRIAR turbina');
+        console.log('📤 Request: GET', `http://192.168.1.64:8080/api/project/add-turbine/${id}`);
+        
+        const newTurbine = await projectsAPI.addTurbine(id);
+        console.log('✅ Turbina criada:', newTurbine);
+        
+        Toast.show({
+          type: 'success',
+          text1: 'Sucesso',
+          text2: 'Turbina criada com sucesso',
+        });
+      } else {
+        console.log('✏️ Modo: EDITAR turbina');
+        
+        if (!selectedTurbine) {
+          throw new Error('Nenhuma turbina selecionada para edição');
+        }
+        
+        const formData = new FormData();
+        formData.append('turbineId', selectedTurbine.id);
+        formData.append('turbineName', data.name ?? selectedTurbine.name ?? '');
+        formData.append(
+          'defectsInspectionReport',
+          (data.defectsInspectionReport ?? selectedTurbine.defectsInspectionReport ?? false) ? 'true' : 'false'
+        );
+        formData.append(
+          'examinationTransformer',
+          (data.examinationTransformer ?? selectedTurbine.examinationTransformer ?? false) ? 'true' : 'false'
+        );
+        formData.append(
+          'measurements690V400V',
+          (data.measurements690V400V ?? selectedTurbine.measurements690V400V ?? false) ? 'true' : 'false'
+        );
+        formData.append(
+          'performanceReportRepairElevator',
+          (data.performanceReportRepairElevator ?? selectedTurbine.performanceReportRepairElevator ?? false) ? 'true' : 'false'
+        );
+        formData.append(
+          'statutoryInspectionReport',
+          (data.statutoryInspectionReport ?? selectedTurbine.statutoryInspectionReport ?? false) ? 'true' : 'false'
+        );
+        
+        await projectsAPI.updateTurbine(formData);
+        
+        console.log('✅ Turbina atualizada com sucesso');
+        
+        Toast.show({
+          type: 'success',
+          text1: 'Sucesso',
+          text2: 'Turbina atualizada com sucesso',
+        });
+      }
+      
+      console.log('🔄 Recarregando lista de turbinas...');
+      await loadTurbines(id);
+      
+      setTurbineSheetVisible(false);
+      
+    } catch (error: any) {
+      console.error('❌ Erro ao submeter formulário:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      
+      const errorMessage = 
+        error.response?.data?.message || 
+        error.response?.data || 
+        error.message || 
+        'Erro desconhecido ao atualizar turbina';
+      
+      Alert.alert(
+        'Erro',
+        typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage)
+      );
+    }
+  };
 
   if (isLoading || !selectedProject) {
     return (
@@ -216,7 +194,6 @@ const handleTurbineFormSubmit = async (data: any) => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <IconButton
           icon="arrow-left"
@@ -248,7 +225,6 @@ const handleTurbineFormSubmit = async (data: any) => {
         </View>
       </View>
 
-      {/* Info Cards */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.infoCards}>
           <Card style={styles.infoCard}>
@@ -274,7 +250,6 @@ const handleTurbineFormSubmit = async (data: any) => {
           </Card>
         </View>
 
-        {/* Project Details */}
         <Card style={styles.detailsCard}>
           <Card.Content>
             <Text variant="titleMedium" style={styles.sectionTitle}>
@@ -314,7 +289,6 @@ const handleTurbineFormSubmit = async (data: any) => {
           </Card.Content>
         </Card>
 
-        {/* Tabs */}
         <View style={styles.tabsContainer}>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'turbines' && styles.tabActive]}
@@ -350,16 +324,12 @@ const handleTurbineFormSubmit = async (data: any) => {
           </TouchableOpacity>
         </View>
 
-        {/* Tab Content - Turbines */}
         {activeTab === 'turbines' && (
           <View style={styles.tabContent}>
             {turbines.length === 0 ? (
               <View style={styles.emptyState}>
                 <Text variant="bodyLarge" style={styles.emptyText}>
                   Nenhuma turbina registada
-                </Text>
-                <Text variant="bodySmall" style={styles.emptySubtext}>
-                  Adicione a primeira turbina
                 </Text>
               </View>
             ) : (
@@ -370,44 +340,25 @@ const handleTurbineFormSubmit = async (data: any) => {
                   activeOpacity={0.7}
                 >
                   <Card style={styles.turbineCard}>
-                    <Card.Content>
-                      <View style={styles.turbineHeader}>
-                        <View style={styles.turbineInfo}>
-                          <Text variant="titleMedium" style={styles.turbineName}>
-                            {turbine.name}
-                          </Text>
-                          {turbine.number && (
-                            <Text variant="bodySmall" style={styles.turbineNumber}>
-                              WTG-{turbine.number}
-                            </Text>
-                          )}
-                        </View>
-                        <View style={styles.turbineActions}>
-                          <IconButton
-                            icon="pencil"
-                            size={20}
-                            iconColor={colors.primary}
-                            onPress={(e) => handleEditTurbine(turbine, e)}
-                          />
-                          <IconButton
-                            icon="chevron-right"
-                            size={24}
-                            iconColor={colors.primary}
-                          />
-                        </View>
+                    <Card.Content style={styles.turbineCardContent}>
+                      <View style={styles.turbineInfo}>
+                        <Text variant="titleMedium">{turbine.name}</Text>
+                        <Text variant="bodySmall" style={styles.turbineStatus}>
+                          Ativa
+                        </Text>
                       </View>
-
-                      <View style={styles.turbineChips}>
-                        {turbine.type && (
-                          <Chip icon="cog" style={styles.chip}>
-                            {turbine.type}
-                          </Chip>
-                        )}
-                        {turbine.year && (
-                          <Chip icon="calendar" style={styles.chip}>
-                            {turbine.year}
-                          </Chip>
-                        )}
+                      <View style={styles.turbineActions}>
+                        <IconButton
+                          icon="pencil"
+                          size={20}
+                          onPress={(e) => handleEditTurbine(turbine, e)}
+                        />
+                        <IconButton
+                          icon="delete"
+                          size={20}
+                          iconColor={colors.error}
+                          onPress={(e) => handleDeleteTurbinePress(turbine, e)}
+                        />
                       </View>
                     </Card.Content>
                   </Card>
@@ -417,7 +368,6 @@ const handleTurbineFormSubmit = async (data: any) => {
           </View>
         )}
 
-        {/* Tab Content - Reports */}
         {activeTab === 'reports' && (
           <View style={styles.tabContent}>
             <View style={styles.emptyState}>
@@ -428,7 +378,6 @@ const handleTurbineFormSubmit = async (data: any) => {
           </View>
         )}
 
-        {/* Tab Content - Historic */}
         {activeTab === 'historic' && (
           <View style={styles.tabContent}>
             <View style={styles.emptyState}>
@@ -440,7 +389,6 @@ const handleTurbineFormSubmit = async (data: any) => {
         )}
       </ScrollView>
 
-      {/* FAB - Add Turbine */}
       {activeTab === 'turbines' && (
         <FAB
           icon="plus"
@@ -451,7 +399,6 @@ const handleTurbineFormSubmit = async (data: any) => {
         />
       )}
 
-      {/* Turbine Form Sheet */}
       <TurbineFormSheet
         visible={turbineSheetVisible}
         onDismiss={() => setTurbineSheetVisible(false)}
@@ -461,7 +408,6 @@ const handleTurbineFormSubmit = async (data: any) => {
         projectId={id}
       />
 
-      {/* Delete Confirmation Dialog */}
       <Portal>
         <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)}>
           <Dialog.Title>Eliminar Projeto</Dialog.Title>
@@ -476,6 +422,26 @@ const handleTurbineFormSubmit = async (data: any) => {
           <Dialog.Actions>
             <Button onPress={() => setDeleteDialogVisible(false)}>Cancelar</Button>
             <Button onPress={handleDeleteConfirm} textColor={colors.error}>
+              Eliminar
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      <Portal>
+        <Dialog visible={deleteTurbineDialogVisible} onDismiss={() => setDeleteTurbineDialogVisible(false)}>
+          <Dialog.Title>Eliminar Turbina</Dialog.Title>
+          <Dialog.Content>
+            <Text>
+              Tem a certeza que deseja eliminar a turbina "{turbineToDelete?.name}"?
+            </Text>
+            <Text style={{ marginTop: 8, color: colors.error }}>
+              Esta ação não pode ser desfeita.
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setDeleteTurbineDialogVisible(false)}>Cancelar</Button>
+            <Button onPress={handleDeleteTurbineConfirm} textColor={colors.error}>
               Eliminar
             </Button>
           </Dialog.Actions>
@@ -528,7 +494,6 @@ const styles = StyleSheet.create({
   },
   infoCard: {
     flex: 1,
-    elevation: 2,
   },
   infoCardContent: {
     alignItems: 'center',
@@ -539,53 +504,47 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     color: colors.textSecondary,
-    marginTop: spacing.xs,
+    marginTop: spacing.xs / 2,
   },
   detailsCard: {
     margin: spacing.md,
-    elevation: 2,
+    marginTop: 0,
   },
   sectionTitle: {
-    fontWeight: 'bold',
     marginBottom: spacing.md,
-    color: colors.text,
+    fontWeight: 'bold',
   },
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   detailLabel: {
     color: colors.textSecondary,
-    fontSize: 14,
   },
   detailValue: {
-    color: colors.text,
-    fontSize: 14,
     fontWeight: '500',
   },
   tabsContainer: {
     flexDirection: 'row',
     marginHorizontal: spacing.md,
     marginTop: spacing.md,
-    borderBottomWidth: 2,
+    borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   tab: {
     flex: 1,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
     alignItems: 'center',
   },
   tabActive: {
-    borderBottomWidth: 3,
+    borderBottomWidth: 2,
     borderBottomColor: colors.primary,
   },
   tabText: {
     color: colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '500',
   },
   tabTextActive: {
     color: colors.primary,
@@ -595,10 +554,9 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   turbineCard: {
-    marginBottom: spacing.md,
-    elevation: 2,
+    marginBottom: spacing.sm,
   },
-  turbineHeader: {
+  turbineCardContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -606,40 +564,23 @@ const styles = StyleSheet.create({
   turbineInfo: {
     flex: 1,
   },
-  turbineActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  turbineName: {
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  turbineNumber: {
-    color: colors.textSecondary,
+  turbineStatus: {
+    color: colors.success,
     marginTop: spacing.xs / 2,
   },
-  turbineChips: {
+  turbineActions: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  chip: {
-    backgroundColor: colors.surface,
   },
   emptyState: {
-    paddingVertical: spacing.xxl,
+    padding: spacing.xl,
     alignItems: 'center',
   },
   emptyText: {
     color: colors.textSecondary,
-    marginBottom: spacing.sm,
-  },
-  emptySubtext: {
-    color: colors.textLight,
   },
   fab: {
     position: 'absolute',
-    margin: spacing.md,
+    margin: 16,
     right: 0,
     bottom: 0,
     backgroundColor: colors.primary,
