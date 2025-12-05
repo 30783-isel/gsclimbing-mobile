@@ -59,6 +59,15 @@ export const defectInspectionReportAPI = {
   },
 
   /**
+   * Eliminar relatório e respetivas imagens
+   */
+  delete: async (reportId: number): Promise<void> => {
+    await httpClient.delete(
+      `${API_CONFIG.baseUrl}reports/mobile/defect-inspection/${reportId}`
+    );
+  },
+
+  /**
    * Upload de foto (usa endpoint existente)
    */
   uploadPhoto: async (
