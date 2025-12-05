@@ -52,7 +52,7 @@ export default function DefectInspectionReportsListScreen() {
       console.log(`📋 Carregando relatórios da turbina ${turbineId}...`);
 
       const data = await defectInspectionReportAPI.getByTurbineId(
-        turbineId.toString()
+        parseInt(turbineId)
       );
       setReports(data);
 
@@ -115,7 +115,7 @@ export default function DefectInspectionReportsListScreen() {
             try {
               console.log(`🗑️ Eliminando relatório ${reportId}...`);
               
-              await defectInspectionReportAPI.delete(reportId.toString());
+              await defectInspectionReportAPI.delete(reportId);
               
               // Remover da lista local
               setReports((prev) => prev.filter((r) => r.reportId !== reportId));
