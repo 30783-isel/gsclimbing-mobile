@@ -91,7 +91,7 @@ const handleTurbineFormSubmit = async (data: any) => {
       }
       
       console.log('📝 Criando turbina no projeto:', selectedProject.name);
-      await projectsAPI.addTurbine(selectedProject.name);
+      await projectsAPI.addTurbine(selectedProject.idProject);
       
       Toast.show({
         type: 'success',
