@@ -32,6 +32,15 @@ export const defectInspectionReportAPI = {
     return response.data;
   },
 
+    /**
+   * Eliminar relatório e respetivas imagens
+   */
+  delete: async (reportId: string): Promise<void> => {
+    await httpClient.delete(
+      `${API_CONFIG.baseUrl}reports/mobile/defect-inspection/${reportId}`
+    );
+  },
+  
   /**
    * Obter lista de relatórios de uma turbina
    */

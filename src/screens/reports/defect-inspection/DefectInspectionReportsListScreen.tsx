@@ -2,91 +2,139 @@ import React, { useEffect, useState } from 'react';
 import {
   View,
   StyleSheet,
-  FlatList,
-  RefreshControl,
   TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
 } from 'react-native';
 import {
   Text,
-  Card,
   IconButton,
-  ActivityIndicator,
+  Card,
   Chip,
   Surface,
+  Menu,
+  Divider,
 } from 'react-native-paper';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, spacing } from '@/constants/theme';
-import { defectInspectionReportAPI } from '@/reports/defectInspectionReport/defectInspectionReport.api';
-import type { DefectInspectionReportResponse } from '@/reports/defectInspectionReport/defectInspectionReport.types';
-import Toast from 'react-native-toast-message';
+import { defectInspectionReportAPI } from '@/services/api/defectInspectionReport.api';
+import type { DefectInspectionReportResponse } from '@/types/defectInspectionReport.types';
 
 export default function DefectInspectionReportsListScreen() {
-  const router = useRouter();
   const { turbineId, turbineName, projectName } = useLocalSearchParams<{
     turbineId: string;
     turbineName: string;
     projectName: string;
   }>();
+  const router = useRouter();
 
+  // State
   const [reports, setReports] = useState<DefectInspectionReportResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [menuVisible, setMenuVisible] = useState<{ [key: number]: boolean }>({});
 
+  /**
+   * Carregar relatórios ao montar componente
+   */
   useEffect(() => {
     loadReports();
   }, [turbineId]);
 
+  /**
+   * Carregar relatórios da turbina
+   */
   const loadReports = async () => {
+    if (!turbineId) return;
+
     try {
       setIsLoading(true);
-      console.log('📋 Carregando relatórios da turbina:', turbineId);
+      console.log(`📋 Carregando relatórios da turbina ${turbineId}...`);
 
       const data = await defectInspectionReportAPI.getByTurbineId(
-        Number(turbineId)
+        turbineId.toString()
       );
-
       setReports(data);
+
       console.log(`✅ ${data.length} relatórios carregados`);
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Erro ao carregar relatórios:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Erro',
-        text2: error.response?.data?.message || 'Erro ao carregar relatórios',
-      });
+      Alert.alert('Erro', 'Não foi possível carregar os relatórios');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleEditReport = (reportId: number) => {
-    router.push({
-      pathname: '/(tabs)/admin/reports/defect-inspection/edit' as any,
-      params: { reportId: reportId.toString() },
-    });
-  };
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await loadReports();
-    setIsRefreshing(false);
-  };
-
+  /**
+   * Navegar para detalhes do relatório
+   */
   const handleReportPress = (reportId: number) => {
     router.push({
-      pathname: '/(tabs)/admin/reports/defect-inspection/view' as any,
+      pathname: '/(tabs)/admin/reports/defect-inspection/edit' as any,
       params: {
         reportId: reportId.toString(),
-        turbineName,
-        projectName,
+        turbineName: turbineName || 'Turbina',
+        projectName: projectName || 'Projeto',
       },
     });
   };
 
+  /**
+   * Voltar atrás
+   */
   const handleBack = () => {
     router.back();
   };
 
+  /**
+   * Toggle menu de opções
+   */
+  const toggleMenu = (reportId: number) => {
+    setMenuVisible((prev) => ({
+      ...prev,
+      [reportId]: !prev[reportId],
+    }));
+  };
+
+  /**
+   * Eliminar relatório
+   */
+  const handleDeleteReport = async (reportId: number) => {
+    Alert.alert(
+      'Eliminar Relatório',
+      'Tem a certeza que deseja eliminar este relatório? Esta ação não pode ser revertida.',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log(`🗑️ Eliminando relatório ${reportId}...`);
+              
+              await defectInspectionReportAPI.delete(reportId.toString());
+              
+              // Remover da lista local
+              setReports((prev) => prev.filter((r) => r.reportId !== reportId));
+              
+              Alert.alert('Sucesso', 'Relatório eliminado com sucesso');
+              console.log('✅ Relatório eliminado');
+            } catch (error) {
+              console.error('❌ Erro ao eliminar relatório:', error);
+              Alert.alert('Erro', 'Não foi possível eliminar o relatório');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  /**
+   * Formatar data
+   */
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('pt-PT', {
@@ -96,13 +144,15 @@ export default function DefectInspectionReportsListScreen() {
     });
   };
 
-  const renderReportItem = ({
-    item,
-  }: {
-    item: DefectInspectionReportResponse;
-  }) => (
-    <TouchableOpacity onPress={() => handleReportPress(item.reportId)}>
-      <Card style={styles.card} mode="elevated">
+  /**
+   * Renderizar item da lista
+   */
+  const renderReportItem = (item: DefectInspectionReportResponse) => (
+    <Card key={item.reportId} style={styles.card} mode="elevated">
+      <TouchableOpacity
+        onPress={() => handleReportPress(item.reportId)}
+        activeOpacity={0.7}
+      >
         <Card.Content>
           <View style={styles.cardHeader}>
             <View style={styles.headerLeft}>
@@ -113,11 +163,39 @@ export default function DefectInspectionReportsListScreen() {
                 {formatDate(item.createDate)}
               </Text>
             </View>
-            <IconButton
-              icon="chevron-right"
-              size={24}
-              iconColor={colors.primary}
-            />
+            
+            {/* Menu de opções */}
+            <Menu
+              visible={menuVisible[item.reportId] || false}
+              onDismiss={() => toggleMenu(item.reportId)}
+              anchor={
+                <IconButton
+                  icon="dots-vertical"
+                  size={24}
+                  iconColor={colors.text}
+                  onPress={() => toggleMenu(item.reportId)}
+                />
+              }
+            >
+              <Menu.Item
+                onPress={() => {
+                  toggleMenu(item.reportId);
+                  handleReportPress(item.reportId);
+                }}
+                leadingIcon="pencil"
+                title="Editar"
+              />
+              <Divider />
+              <Menu.Item
+                onPress={() => {
+                  toggleMenu(item.reportId);
+                  handleDeleteReport(item.reportId);
+                }}
+                leadingIcon="delete"
+                title="Eliminar"
+                titleStyle={{ color: colors.error }}
+              />
+            </Menu>
           </View>
 
           <View style={styles.chipContainer}>
@@ -132,8 +210,8 @@ export default function DefectInspectionReportsListScreen() {
             </Chip>
           </View>
         </Card.Content>
-      </Card>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </Card>
   );
 
   if (isLoading) {
@@ -182,19 +260,12 @@ export default function DefectInspectionReportsListScreen() {
           </Text>
         </View>
       ) : (
-        <FlatList
-          data={reports}
-          renderItem={renderReportItem}
-          keyExtractor={(item) => item.reportId.toString()}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={handleRefresh}
-              colors={[colors.primary]}
-            />
-          }
-        />
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {reports.map((report) => renderReportItem(report))}
+        </ScrollView>
       )}
     </View>
   );
@@ -205,16 +276,25 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+  loadingText: {
+    marginTop: spacing.md,
+    color: colors.textSecondary,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.primary,
     paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xs,
   },
   headerCenter: {
     flex: 1,
-    alignItems: 'center',
+    marginLeft: spacing.sm,
   },
   headerTitle: {
     color: colors.white,
@@ -224,46 +304,41 @@ const styles = StyleSheet.create({
     color: colors.white,
     opacity: 0.9,
   },
-  loadingContainer: {
+  scrollView: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  loadingText: {
-    marginTop: spacing.md,
-    color: colors.textSecondary,
-  },
-  listContent: {
+  scrollContent: {
     padding: spacing.md,
   },
   card: {
     marginBottom: spacing.md,
-    backgroundColor: colors.white,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
   },
   headerLeft: {
     flex: 1,
   },
   reportTitle: {
-    fontWeight: 'bold',
     color: colors.text,
+    fontWeight: 'bold',
+    marginBottom: spacing.xs / 2,
   },
   reportDate: {
     color: colors.textSecondary,
-    marginTop: spacing.xs,
   },
   chipContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: spacing.md,
     gap: spacing.xs,
   },
   chip: {
     marginRight: spacing.xs,
+    marginTop: spacing.xs / 2,
   },
   emptyContainer: {
     flex: 1,
@@ -272,12 +347,11 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   emptyTitle: {
-    marginTop: spacing.md,
     color: colors.text,
-    fontWeight: 'bold',
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
   emptyText: {
-    marginTop: spacing.sm,
     color: colors.textSecondary,
     textAlign: 'center',
   },
