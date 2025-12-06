@@ -4,7 +4,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { v4 as uuidv4 } from 'uuid';
+import uuid from 'react-native-uuid';
 
 // ========== TIPOS ==========
 
@@ -47,7 +47,7 @@ class OfflineReportsService {
    * Criar novo relatório offline
    */
   async create(report: Omit<OfflineReport, 'tempId' | 'status' | 'createdAt' | 'lastModified' | 'syncAttempts'>): Promise<OfflineReport> {
-    const tempId = uuidv4();
+    const tempId = uuid.v4();
     const now = new Date().toISOString();
 
     const newReport: OfflineReport = {
