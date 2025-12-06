@@ -4,7 +4,7 @@
  */
 
 import NetInfo from '@react-native-community/netinfo';
-import { offlineReportsService, OfflineReport } from './offlineReports.service';
+import { offlineReportsService, OfflineReport } from '@/services/storage/offlineReports.service';
 import httpClient from '@/services/httpClient';
 import { API_CONFIG } from '@/constants/api';
 

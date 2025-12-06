@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { TextInput, Text, HelperText, Card, Button, Chip } from 'react-native-paper';
 import { colors, spacing } from '@/constants/theme';
-import { useOfflineReports } from '@/hooks/useOfflineReports';
+import { useOfflineReports } from '@/hooks/useOfflineReports.hook';
 
 interface Step1Props {
   site: string;

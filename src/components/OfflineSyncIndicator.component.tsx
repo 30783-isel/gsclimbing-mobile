@@ -7,7 +7,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Surface, Text, IconButton, ProgressBar, Chip } from 'react-native-paper';
 import { colors, spacing } from '@/constants/theme';
-import { useOfflineReports } from '@/hooks/useOfflineReports';
+import { useOfflineReports } from '@/hooks/useOfflineReports.hook';
 
 interface OfflineSyncIndicatorProps {
   onSyncPress?: () => void;

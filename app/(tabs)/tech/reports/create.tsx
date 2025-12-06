@@ -1,8 +1,4 @@
-/**
- * DefectInspectionReportCreateScreen
- * Ecrã principal de criação de Defect Inspection Report
- * Integra 3 steps + sistema offline + validação + sincronização
- */
+// app/reports/defect-inspection/create.tsx
 
 import React, { useState } from 'react';
 import { View, StyleSheet, BackHandler } from 'react-native';
@@ -31,7 +27,7 @@ interface AdditionalField {
   value: string;
 }
 
-export default function DefectInspectionReportCreateScreen() {
+export default function CreateDefectInspectionReport() {
   const router = useRouter();
   const { projectId, turbineId, turbineName } = useLocalSearchParams<{
     projectId: string;
@@ -107,7 +103,7 @@ export default function DefectInspectionReportCreateScreen() {
         wtgType,
         yearConstruction,
         dateInspection: new Date().toISOString().split('T')[0],
-        inspectedBy: '', // Obter do user context
+        inspectedBy: '',
         observations: '',
         additionalFields: additionalFields.reduce((acc, field, index) => {
           acc[`field${index + 1}`] = { label: field.label, value: field.value };
@@ -119,7 +115,7 @@ export default function DefectInspectionReportCreateScreen() {
       const offlineReport = await create({
         projectId: parseInt(projectId),
         turbineId: parseInt(turbineId),
-        reportType: 0, // Defect Inspection Report
+        reportType: 0,
         language,
         data: reportData,
         photos: photos.map(p => ({
@@ -127,13 +123,12 @@ export default function DefectInspectionReportCreateScreen() {
           uri: p.uri,
           filename: `photo_${p.pageNumber}_${p.position}.jpg`,
           mimeType: 'image/jpeg',
-          base64: undefined, // Será convertido na sincronização
+          base64: undefined,
         })),
       });
 
       console.log('✅ Report created offline:', offlineReport.tempId);
 
-      // Se estiver online, marcar para sincronizar imediatamente
       if (isOnline) {
         console.log('🌐 Online - marking for sync...');
         await markForSync(offlineReport.tempId);
@@ -155,7 +150,6 @@ export default function DefectInspectionReportCreateScreen() {
         });
       }
 
-      // Voltar atrás
       setTimeout(() => {
         router.back();
       }, 1000);
@@ -250,7 +244,6 @@ export default function DefectInspectionReportCreateScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <Appbar.Header>
         <Appbar.BackAction onPress={handleCancel} />
         <Appbar.Content
@@ -259,17 +252,14 @@ export default function DefectInspectionReportCreateScreen() {
         />
       </Appbar.Header>
 
-      {/* Progress Bar */}
       <ProgressBar
         progress={currentStep / totalSteps}
         color={colors.primary}
         style={styles.progressBar}
       />
 
-      {/* Offline Indicator */}
       <OfflineSyncIndicator compact />
 
-      {/* Step Content */}
       <View style={styles.content}>{renderStep()}</View>
     </View>
   );

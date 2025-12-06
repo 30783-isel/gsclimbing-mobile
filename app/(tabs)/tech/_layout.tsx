@@ -7,7 +7,13 @@ export default function TechLayout() {
         headerShown: false,
       }}
     >
-      <Stack.Screen name="index" />
+    <Stack.Screen
+      name="reports/defect-inspection/create"
+      options={{
+        presentation: 'modal',
+        headerShown: false,
+      }}
+    />
     </Stack>
   );
 }
