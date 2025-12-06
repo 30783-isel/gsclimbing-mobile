@@ -1,267 +1,178 @@
-// app/reports/defect-inspection/create.tsx
+// app/(tabs)/tech/index.tsx - VERSÃO CORRETA - LISTA DE PROJETOS DO TÉCNICO
 
-import React, { useState } from 'react';
-import { View, StyleSheet, BackHandler } from 'react-native';
-import { Appbar, ProgressBar } from 'react-native-paper';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Platform } from 'react-native';
+import { Text, Card, Searchbar, Chip, IconButton, Surface } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { useAuth } from '@/hooks/useAuth';
+import { useProjects } from '@/hooks/useProjects';
+import { SyncStatus } from '@/components/SyncStatus';
 import { colors, spacing } from '@/constants/theme';
-import { useOfflineReports } from '@/hooks/useOfflineReports.hook';
-import { OfflineSyncIndicator } from '@/components/OfflineSyncIndicator.component';
-import { DefectReportStep1 } from '@/components/reports/DefectReportStep1.component';
-import { DefectReportStep2 } from '@/components/reports/DefectReportStep2.component';
-import { DefectReportStep3 } from '@/components/reports/DefectReportStep3.component';
-import Toast from 'react-native-toast-message';
-import { Alert } from 'react-native';
+import type { Project } from '@/types/project.types';
 
-interface PhotoData {
-  id: string;
-  uri: string;
-  description: string;
-  pageNumber: number;
-  position: number;
-  isUploaded: boolean;
-}
-
-interface AdditionalField {
-  label: string;
-  value: string;
-}
-
-export default function TechScren() {
+export default function TechProjectsScreen() {
   const router = useRouter();
-  const { projectId, turbineId, turbineName } = useLocalSearchParams<{
-    projectId: string;
-    turbineId: string;
-    turbineName: string;
-  }>();
+  const { user, handleLogout } = useAuth();
+  const {
+    projects,
+    isLoading,
+    refreshing,
+    loadProjects,
+    refreshProjects,
+  } = useProjects();
 
-  const { create, markForSync, isOnline } = useOfflineReports();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
 
-  // Estados do formulário
-  const [currentStep, setCurrentStep] = useState(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Carregar projetos ao montar componente
+  useEffect(() => {
+    loadProjects();
+  }, []);
 
-  // Step 1: General Info
-  const [site, setSite] = useState('');
-  const [wtgNumber, setWtgNumber] = useState('');
-  const [wtgType, setWtgType] = useState('');
-  const [yearConstruction, setYearConstruction] = useState('');
-  const [language, setLanguage] = useState<'EN' | 'ES'>('EN');
+  // Filtrar projetos localmente quando muda a query
+  useEffect(() => {
+    let filtered = projects;
 
-  // Step 2: Photos
-  const [photos, setPhotos] = useState<PhotoData[]>([]);
-  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
-
-  // Step 3: Additional Fields
-  const [additionalFields, setAdditionalFields] = useState<AdditionalField[]>([]);
-
-  const totalSteps = 3;
-
-  // Handle back button
-  React.useEffect(() => {
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (currentStep > 1) {
-        setCurrentStep(currentStep - 1);
-        return true;
-      }
-      return false;
-    });
-
-    return () => backHandler.remove();
-  }, [currentStep]);
-
-  // Atualizar campo
-  const handleFieldChange = (field: string, value: string) => {
-    switch (field) {
-      case 'site':
-        setSite(value);
-        break;
-      case 'wtgNumber':
-        setWtgNumber(value);
-        break;
-      case 'wtgType':
-        setWtgType(value);
-        break;
-      case 'yearConstruction':
-        setYearConstruction(value);
-        break;
-    }
-  };
-
-  // Submeter relatório
-  const handleSubmit = async () => {
-    try {
-      setIsSubmitting(true);
-
-      console.log('📝 Creating report...');
-      console.log('Online:', isOnline);
-
-      // Preparar dados do relatório
-      const reportData = {
-        site,
-        wtgNumber,
-        wtgType,
-        yearConstruction,
-        dateInspection: new Date().toISOString().split('T')[0],
-        inspectedBy: '',
-        observations: '',
-        additionalFields: additionalFields.reduce((acc, field, index) => {
-          acc[`field${index + 1}`] = { label: field.label, value: field.value };
-          return acc;
-        }, {} as Record<string, { label: string; value: string }>),
-      };
-
-      // Criar relatório offline
-      const offlineReport = await create({
-        projectId: parseInt(projectId),
-        turbineId: parseInt(turbineId),
-        reportType: 0,
-        language,
-        data: reportData,
-        photos: photos.map(p => ({
-          tempId: p.id,
-          uri: p.uri,
-          filename: `photo_${p.pageNumber}_${p.position}.jpg`,
-          mimeType: 'image/jpeg',
-          base64: undefined,
-        })),
-      });
-
-      console.log('✅ Report created offline:', offlineReport.tempId);
-
-      if (isOnline) {
-        console.log('🌐 Online - marking for sync...');
-        await markForSync(offlineReport.tempId);
-        
-        Toast.show({
-          type: 'success',
-          text1: '✅ Relatório a Sincronizar',
-          text2: 'O relatório está a ser enviado para o servidor...',
-          visibilityTime: 4000,
-        });
-      } else {
-        console.log('📵 Offline - will sync later');
-        
-        Toast.show({
-          type: 'info',
-          text1: '📵 Relatório Guardado Offline',
-          text2: 'Será sincronizado automaticamente quando houver conexão',
-          visibilityTime: 4000,
-        });
-      }
-
-      setTimeout(() => {
-        router.back();
-      }, 1000);
-
-    } catch (error: any) {
-      console.error('❌ Error submitting report:', error);
-      
-      Alert.alert(
-        'Erro',
-        error.message || 'Não foi possível guardar o relatório'
+    // Aplicar pesquisa de texto
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(
+        (p) =>
+          p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.country?.toLowerCase().includes(searchQuery.toLowerCase())
       );
-    } finally {
-      setIsSubmitting(false);
     }
+
+    setFilteredProjects(filtered);
+  }, [projects, searchQuery]);
+
+  const handleProjectPress = (project: Project) => {
+    // Navegar para detalhes do projeto / turbinas
+    router.push({
+      pathname: '/(tabs)/tech/project/[id]',
+      params: { id: project.idProject },
+    });
   };
 
-  // Voltar atrás (cancelar)
-  const handleCancel = () => {
-    Alert.alert(
-      language === 'EN' ? 'Cancel Report?' : '¿Cancelar Informe?',
-      language === 'EN'
-        ? 'All data will be lost. Are you sure?'
-        : 'Se perderán todos los datos. ¿Estás seguro?',
-      [
-        {
-          text: language === 'EN' ? 'Keep Editing' : 'Seguir Editando',
-          style: 'cancel',
-        },
-        {
-          text: language === 'EN' ? 'Cancel Report' : 'Cancelar Informe',
-          style: 'destructive',
-          onPress: () => router.back(),
-        },
-      ]
-    );
-  };
+  const renderProjectCard = ({ item }: { item: Project }) => (
+    <Card style={styles.projectCard} onPress={() => handleProjectPress(item)}>
+      <Card.Content>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardHeaderLeft}>
+            <Text variant="titleMedium" style={styles.projectName}>
+              {item.name}
+            </Text>
+            <View style={styles.locationContainer}>
+              <IconButton icon="map-marker" size={16} style={{ margin: 0 }} />
+              <Text variant="bodySmall" style={styles.locationText}>
+                {item.location}, {item.country}
+              </Text>
+            </View>
+          </View>
+        </View>
 
-  // Renderizar step atual
-  const renderStep = () => {
-    switch (currentStep) {
-      case 1:
-        return (
-          <DefectReportStep1
-            site={site}
-            wtgNumber={wtgNumber}
-            wtgType={wtgType}
-            yearConstruction={yearConstruction}
-            language={language}
-            onFieldChange={handleFieldChange}
-            onLanguageChange={setLanguage}
-            onNext={() => setCurrentStep(2)}
+        <View style={styles.chipsContainer}>
+          <Chip icon="map" compact style={styles.chip}>
+            <Text variant="bodySmall" style={styles.chipText}>
+              Site: {item.site || 'N/A'}
+            </Text>
+          </Chip>
+          <Chip icon="wind-turbine" compact style={styles.chip}>
+            <Text variant="bodySmall" style={styles.chipText}>
+              {item.numberTurbines} {parseInt(item.numberTurbines || '0') === 1 ? 'Turbina' : 'Turbinas'}
+            </Text>
+          </Chip>
+        </View>
+      </Card.Content>
+    </Card>
+  );
+
+  const renderEmpty = () => (
+    <View style={styles.emptyContainer}>
+      <IconButton icon="folder-outline" size={64} iconColor={colors.lightGray} />
+      <Text variant="titleMedium" style={styles.emptyTitle}>
+        Nenhum projeto atribuído
+      </Text>
+      <Text variant="bodyMedium" style={styles.emptyText}>
+        Não tens projetos atribuídos neste momento.
+      </Text>
+    </View>
+  );
+
+  const renderHeader = () => (
+    <View>
+      {/* Header com Sync Status */}
+      <Surface style={styles.header} elevation={2}>
+        <Text variant="headlineSmall" style={styles.headerTitle}>
+          Meus Projetos
+        </Text>
+        <View style={styles.headerRight}>
+          <SyncStatus />
+          <IconButton
+            icon="logout"
+            size={24}
+            iconColor={colors.primary}
+            onPress={handleLogout}
           />
-        );
+        </View>
+      </Surface>
 
-      case 2:
-        return (
-          <DefectReportStep2
-            photos={photos}
-            language={language}
-            onPhotosChange={setPhotos}
-            onNext={() => setCurrentStep(3)}
-            onBack={() => setCurrentStep(1)}
-            uploadProgress={uploadProgress}
-          />
-        );
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Searchbar
+          placeholder="Pesquisar projetos..."
+          onChangeText={setSearchQuery}
+          value={searchQuery}
+          style={styles.searchBar}
+        />
+      </View>
 
-      case 3:
-        return (
-          <DefectReportStep3
-            additionalFields={additionalFields}
-            language={language}
-            onFieldsChange={setAdditionalFields}
-            onBack={() => setCurrentStep(2)}
-            onSubmit={handleSubmit}
-            isSubmitting={isSubmitting}
-          />
-        );
+      {/* Stats */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statBox}>
+          <Text variant="headlineSmall" style={styles.statNumber}>
+            {projects.length}
+          </Text>
+          <Text variant="bodySmall" style={styles.statLabel}>
+            Projetos
+          </Text>
+        </View>
 
-      default:
-        return null;
-    }
-  };
+        <View style={styles.statBox}>
+          <Text variant="headlineSmall" style={styles.statNumber}>
+            {projects.reduce((acc, p) => acc + parseInt(p.numberTurbines || '0'), 0)}
+          </Text>
+          <Text variant="bodySmall" style={styles.statLabel}>
+            Turbinas
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
 
-  // Título do step
-  const getStepTitle = () => {
-    const titles = {
-      EN: ['General Information', 'Photographs', 'Additional Fields'],
-      ES: ['Información General', 'Fotografías', 'Campos Adicionales'],
-    };
-    return titles[language][currentStep - 1];
-  };
+  // ✅ FIX: Usa View em vez de SafeAreaView na web
+  const Container = Platform.OS === 'web' ? View : SafeAreaView;
 
   return (
-    <View style={styles.container}>
-      <Appbar.Header>
-        <Appbar.BackAction onPress={handleCancel} />
-        <Appbar.Content
-          title={turbineName || 'Defect Inspection Report'}
-          subtitle={`${language === 'EN' ? 'Step' : 'Paso'} ${currentStep}/${totalSteps}: ${getStepTitle()}`}
-        />
-      </Appbar.Header>
-
-      <ProgressBar
-        progress={currentStep / totalSteps}
-        color={colors.primary}
-        style={styles.progressBar}
+    <Container style={styles.container} edges={Platform.OS === 'web' ? [] : ['top']}>
+      <FlatList
+        data={filteredProjects}
+        renderItem={renderProjectCard}
+        keyExtractor={(item) => item.idProject}
+        ListHeaderComponent={renderHeader}
+        ListEmptyComponent={renderEmpty}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={refreshProjects}
+            colors={[colors.primary]}
+          />
+        }
+        showsVerticalScrollIndicator={false}
       />
-
-      <OfflineSyncIndicator compact />
-
-      <View style={styles.content}>{renderStep()}</View>
-    </View>
+    </Container>
   );
 }
 
@@ -269,11 +180,122 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+    // ✅ FIX: Max-width e centralização para web
+    ...(Platform.OS === 'web' && {
+      maxWidth: 1200,
+      width: '100%',
+      alignSelf: 'center',
+    }),
   },
-  progressBar: {
-    height: 4,
+  listContent: {
+    flexGrow: 1,
+    paddingBottom: spacing.xl,
   },
-  content: {
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+  },
+  headerTitle: {
+    color: colors.primary,
+    fontWeight: 'bold',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  searchContainer: {
+    padding: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+  searchBar: {
+    elevation: 0,
+    backgroundColor: colors.surface,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+  },
+  statBox: {
     flex: 1,
+    backgroundColor: colors.primary,
+    padding: spacing.md,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  statNumber: {
+    color: colors.white,
+    fontWeight: 'bold',
+  },
+  statLabel: {
+    color: colors.white,
+    marginTop: spacing.xs,
+  },
+  projectCard: {
+    marginHorizontal: spacing.md,
+    marginVertical: spacing.sm,
+    ...(Platform.OS === 'web' && {
+      // Remove elevation na web e usa shadow
+      elevation: 0,
+      shadowColor: colors.black,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+    }),
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.sm,
+  },
+  cardHeaderLeft: {
+    flex: 1,
+  },
+  projectName: {
+    color: colors.text,
+    fontWeight: 'bold',
+    marginBottom: spacing.xs,
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  locationText: {
+    color: colors.textSecondary,
+  },
+  chipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  chip: {
+    backgroundColor: colors.surface,
+  },
+  chipText: {
+    fontSize: 12,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+    marginTop: spacing.xxl,
+  },
+  emptyTitle: {
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  emptyText: {
+    color: colors.textLight,
+    textAlign: 'center',
   },
 });

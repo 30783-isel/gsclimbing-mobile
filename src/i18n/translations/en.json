@@ -1,5 +1,7 @@
 {
   "GSCLIMBING": {
+    "ADMINISTRATORS": "Administrators",
+    "TECHNICIANS": "Technicians",
     "LOGIN": "Login",
     "LOGOUT": "Logout",
     "USERNAME": "Username",
