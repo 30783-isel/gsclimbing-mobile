@@ -109,6 +109,7 @@ export default function DefectInspectionReportCreateScreen() {
         dateInspection: new Date().toISOString().split('T')[0],
         inspectedBy: '', // Obter do user context
         observations: '',
+        language,
         additionalFields: additionalFields.reduce((acc, field, index) => {
           acc[`field${index + 1}`] = { label: field.label, value: field.value };
           return acc;

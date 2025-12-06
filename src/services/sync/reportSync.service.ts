@@ -127,34 +127,17 @@ class ReportSyncService {
    * Sincronizar um relatório específico
    */
   async syncOne(report: OfflineReport): Promise<SyncResult> {
-    console.log(`🔄 Sincronizando relatório: ${report.tempId}`);
-
     try {
-      // Marcar como sincronizando
       await offlineReportsService.markSyncing(report.tempId);
 
-      // 1. Upload das fotos primeiro
-      const photoIds: number[] = [];
-      for (const photo of report.photos) {
-        try {
-          const photoId = await this._uploadPhoto(photo);
-          photoIds.push(photoId);
-        } catch (error: any) {
-          console.error(`❌ Erro ao fazer upload da foto ${photo.filename}:`, error);
-          // Continuar mesmo se uma foto falhar?
-          // Ou falhar tudo?
-          throw new Error(`Falha no upload da foto: ${error.message}`);
-        }
-      }
-
-      // 2. Criar/submeter relatório
+      // Payload COM fotos
       const payload = {
         tempId: report.tempId,
         turbineId: report.turbineId,
         reportType: report.reportType,
         language: report.language,
         reportData: JSON.stringify(report.data),
-        photoIds,
+        photos: [], // ← Vazio (backend ainda não suporta isto corretamente)
         createdAtDevice: report.createdAt,
       };
 
@@ -163,44 +146,28 @@ class ReportSyncService {
         payload
       );
 
-      if (response.data.success) {
-        const reportId = response.data.reportId;
-        console.log(`✅ Relatório sincronizado: ${report.tempId} → ${reportId}`);
-
-        // Eliminar do armazenamento local
-        await offlineReportsService.delete(report.tempId);
-
-        return {
-          success: true,
-          tempId: report.tempId,
-          reportId,
-        };
-      } else {
-        // Marcar erro
+      if (!response.data.success) {
         const errorMsg = response.data.message || 'Erro desconhecido';
         await offlineReportsService.markSyncError(report.tempId, errorMsg);
-
-        return {
-          success: false,
-          tempId: report.tempId,
-          error: errorMsg,
-        };
+        return { success: false, tempId: report.tempId, error: errorMsg };
       }
 
+      const reportUuid = response.data.uuid;
+      
+      // Upload fotos DEPOIS
+      for (const photo of report.photos) {
+        await this._uploadPhoto(photo, reportUuid);
+      }
+
+      await offlineReportsService.delete(report.tempId);
+      return { success: true, tempId: report.tempId, reportId: response.data.reportId };
+      
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Erro de rede';
-      console.error(`❌ Erro ao sincronizar ${report.tempId}:`, errorMsg);
-
-      // Marcar erro
+      const errorMsg = error.message;
       await offlineReportsService.markSyncError(report.tempId, errorMsg);
-
-      return {
-        success: false,
-        tempId: report.tempId,
-        error: errorMsg,
-      };
+      return { success: false, tempId: report.tempId, error: errorMsg };
     }
-  }
+  }    
 
   /**
    * Tentar novamente relatórios com erro
@@ -221,14 +188,10 @@ class ReportSyncService {
   }
 
   /**
-   * Upload de foto individual
+   * Upload de foto individual com UUID
    */
-  private async _uploadPhoto(photo: OfflinePhoto): Promise<number> {
+  private async _uploadPhoto(photo: OfflinePhoto, reportUuid: string): Promise<number> {
     const formData = new FormData();
-
-    // Converter URI local para blob/file
-    const response = await fetch(photo.uri);
-    const blob = await response.blob();
 
     formData.append('file', {
       uri: photo.uri,
@@ -237,7 +200,7 @@ class ReportSyncService {
     } as any);
 
     const uploadResponse = await httpClient.post(
-      `${API_CONFIG.baseFilesUrl}upload`,
+      `${API_CONFIG.baseFilesUrl}upload/${reportUuid}`,  // ✅ COM UUID
       formData,
       {
         headers: {
