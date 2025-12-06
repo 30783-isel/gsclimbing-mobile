@@ -161,4 +161,15 @@ export const projectsAPI = {
       `${API_CONFIG.baseProjectsUrl}update-users-project/${idProject}/${usersParam}`
     );
   },
+
+/**
+ * Obter projetos de um utilizador por USERNAME (fallback)
+ */
+  getByUsername: async (username: string): Promise<Project[]> => {
+    const response = await httpClient.get(
+      `${API_CONFIG.baseProjectsUrl}projects-by-user/${username}`
+    );
+    return response.data;
+  },
+
 };

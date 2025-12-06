@@ -26,36 +26,47 @@ export const useProjects = () => {
 
   const [refreshing, setRefreshing] = useState(false);
 
-  /**
-   * Carregar todos os projetos
-   */
-  const loadProjects = useCallback(async () => {
-    try {
-      setLoading(true);
-      clearError();
+/**
+ * Carregar todos os projetos
+ */
+const loadProjects = useCallback(async () => {
+  try {
+    setLoading(true);
+    clearError();
 
-      let data;
-      if (role === 'ADMIN') {
-        data = await projectsAPI.getAll();
-      } else if (user?.idUser) {
-        data = await projectsAPI.getByUserId(user.idUser);
-      } else {
-        throw new Error('User not found');
-      }
+    console.log('📦 Loading projects:', { 
+      role, 
+      username: user?.username,
+      idUser: user?.idUser 
+    });
 
-      setProjects(data);
-    } catch (err: any) {
-      const message = err.response?.data?.message || 'Erro ao carregar projetos';
-      setError(message);
-      Toast.show({
-        type: 'error',
-        text1: 'Erro',
-        text2: message,
-      });
-    } finally {
-      setLoading(false);
+    let data;
+    if (role === 'ADMIN') {
+      console.log('👑 Admin - loading all projects');
+      data = await projectsAPI.getAll();
+    } else if (user?.username) {
+      // ✅ FIX: Usa username em vez de idUser
+      console.log('🔧 Tech - loading projects by username:', user.username);
+      data = await projectsAPI.getByUsername(user.username);
+    } else {
+      throw new Error('User not found');
     }
-  }, [role, user, setProjects, setLoading, setError, clearError]);
+
+    console.log('✅ Projects loaded:', data.length);
+    setProjects(data);
+  } catch (err: any) {
+    const message = err.response?.data?.message || 'Erro ao carregar projetos';
+    console.error('❌ Error loading projects:', message);
+    setError(message);
+    Toast.show({
+      type: 'error',
+      text1: 'Erro',
+      text2: message,
+    });
+  } finally {
+    setLoading(false);
+  }
+}, [role, user, setProjects, setLoading, setError, clearError]);
 
   /**
    * Refresh (pull-to-refresh)
