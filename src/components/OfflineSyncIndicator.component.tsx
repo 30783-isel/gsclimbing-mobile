@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   },
   lastSyncText: {
     fontSize: 11,
-    color: colors.textTertiary,
+    color: colors.textLight,
     fontStyle: 'italic',
   },
   offlineChip: {
