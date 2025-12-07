@@ -14,7 +14,7 @@ import { Text, Card, IconButton, Surface, Searchbar, Chip } from 'react-native-p
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { colors, spacing } from '@/constants/theme';
-import { projectAPI } from '@/services/api/project.api';
+import { projectsAPI } from '@/services/api/projects.api';
 import { turbineAPI } from '@/services/api/turbine.api';
 import type { Project } from '@/types/project.types';
 import type { Turbine } from '@/types/turbine.types';
@@ -51,13 +51,16 @@ export default function TechProjectDetailScreen() {
       setIsLoading(true);
       console.log('📦 Carregando projeto:', id);
 
-      const projectData = await projectAPI.getById(parseInt(id));
+      const projectData = await projectsAPI.getById(parseInt(id));
       setProject(projectData);
 
       const turbinesData = await turbineAPI.getByProject(parseInt(id));
-      setTurbines(turbinesData);
-
+      
+      // Debug: ver estrutura das turbinas
+      console.log('🔍 Estrutura das turbinas:', JSON.stringify(turbinesData[0], null, 2));
       console.log(`✅ ${turbinesData.length} turbinas carregadas`);
+      
+      setTurbines(turbinesData);
     } catch (error) {
       console.error('❌ Erro ao carregar projeto:', error);
     } finally {
@@ -76,11 +79,19 @@ export default function TechProjectDetailScreen() {
   };
 
   const handleTurbinePress = (turbine: Turbine) => {
+    // Usar idTurbine se existir, senão usar id
+    const turbineIdValue = turbine.idTurbine || turbine.id;
+    
+    if (!turbineIdValue) {
+      console.error('❌ Turbina sem ID:', turbine);
+      return;
+    }
+    
     // Navegar para ver relatórios desta turbina
     router.push({
       pathname: '/(tabs)/tech/reports/turbine/[turbineId]',
       params: {
-        turbineId: turbine.idTurbine.toString(),
+        turbineId: turbineIdValue.toString(),
         turbineName: turbine.name,
         projectId: id,
         projectName: project?.name || '',
@@ -189,7 +200,7 @@ export default function TechProjectDetailScreen() {
       <FlatList
         data={filteredTurbines}
         renderItem={renderTurbineCard}
-        keyExtractor={(item) => item.idTurbine.toString()}
+        keyExtractor={(item) => (item.idTurbine?.toString() || item.id?.toString() || Math.random().toString())}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmpty}
         contentContainerStyle={filteredTurbines.length === 0 ? styles.emptyListContent : undefined}
@@ -253,7 +264,7 @@ const styles = StyleSheet.create({
   infoValue: {
     fontWeight: '700',
     color: colors.primary,
-    marginTop: spacing.xxs,
+    marginTop: spacing.xs,
   },
   searchContainer: {
     paddingHorizontal: spacing.md,

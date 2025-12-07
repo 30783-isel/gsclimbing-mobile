@@ -157,7 +157,7 @@ export default function TechReportsScreen() {
    */
   const renderReportCard = ({ item }: { item: DefectInspectionReportResponse }) => (
     <Card style={styles.reportCard}>
-      <TouchableOpacity onPress={() => handleReportPress(item.idDefectInspectionReport)}>
+      <TouchableOpacity onPress={() => handleReportPress(item.reportId)}>
         <Card.Content>
           <View style={styles.cardHeader}>
             <View style={styles.cardTitle}>
@@ -170,20 +170,20 @@ export default function TechReportsScreen() {
             </View>
 
             <Menu
-              visible={menuVisible[item.idDefectInspectionReport] || false}
-              onDismiss={() => toggleMenu(item.idDefectInspectionReport)}
+              visible={menuVisible[item.reportId] || false}
+              onDismiss={() => toggleMenu(item.reportId)}
               anchor={
                 <IconButton
                   icon="dots-vertical"
                   size={20}
-                  onPress={() => toggleMenu(item.idDefectInspectionReport)}
+                  onPress={() => toggleMenu(item.reportId)}
                 />
               }
             >
               <Menu.Item
                 onPress={() => {
-                  toggleMenu(item.idDefectInspectionReport);
-                  handleReportPress(item.idDefectInspectionReport);
+                  toggleMenu(item.reportId);
+                  handleReportPress(item.reportId);
                 }}
                 title="Ver Detalhes"
                 leadingIcon="eye"
@@ -191,8 +191,8 @@ export default function TechReportsScreen() {
               <Divider />
               <Menu.Item
                 onPress={() => {
-                  toggleMenu(item.idDefectInspectionReport);
-                  handleDeleteReport(item.idDefectInspectionReport);
+                  toggleMenu(item.reportId);
+                  handleDeleteReport(item.reportId);
                 }}
                 title="Eliminar"
                 leadingIcon="delete"
@@ -209,8 +209,8 @@ export default function TechReportsScreen() {
             <View style={styles.detailRow}>
               <IconButton icon="calendar" size={16} style={styles.detailIcon} />
               <Text variant="bodySmall">
-                {item.dateInspection
-                  ? new Date(item.dateInspection).toLocaleDateString('pt-PT')
+                {item.createDate
+                  ? new Date(item.createDate).toLocaleDateString('pt-PT')
                   : 'Data não definida'}
               </Text>
             </View>
@@ -311,7 +311,7 @@ export default function TechReportsScreen() {
       <FlatList
         data={filteredReports}
         renderItem={renderReportCard}
-        keyExtractor={(item) => item.idDefectInspectionReport.toString()}
+        keyExtractor={(item) => item.reportId.toString()}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmpty}
         contentContainerStyle={filteredReports.length === 0 ? styles.emptyListContent : undefined}
