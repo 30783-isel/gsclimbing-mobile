@@ -1,4 +1,4 @@
-// app/(tabs)/tech/index.tsx - VERSÃO CORRETA - LISTA DE PROJETOS DO TÉCNICO
+// app/(tabs)/tech/index.tsx - LISTA DE PROJETOS DO TÉCNICO COM NAVEGAÇÃO PARA RELATÓRIOS
 
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Platform } from 'react-native';
@@ -102,12 +102,18 @@ export default function TechProjectsScreen() {
 
   const renderHeader = () => (
     <View>
-      {/* Header com Sync Status */}
+      {/* Header com Sync Status e Botão de Relatórios */}
       <Surface style={styles.header} elevation={2}>
         <Text variant="headlineSmall" style={styles.headerTitle}>
           Meus Projetos
         </Text>
         <View style={styles.headerRight}>
+          <IconButton
+            icon="file-document-multiple"
+            size={24}
+            iconColor={colors.primary}
+            onPress={() => router.push('/(tabs)/tech/reports')}
+          />
           <SyncStatus />
           <IconButton
             icon="logout"
@@ -180,7 +186,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    // ✅ FIX: Max-width e centralização para web
     ...(Platform.OS === 'web' && {
       maxWidth: 1200,
       width: '100%',
@@ -241,7 +246,6 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.md,
     marginVertical: spacing.sm,
     ...(Platform.OS === 'web' && {
-      // Remove elevation na web e usa shadow
       elevation: 0,
       shadowColor: colors.black,
       shadowOffset: { width: 0, height: 2 },
