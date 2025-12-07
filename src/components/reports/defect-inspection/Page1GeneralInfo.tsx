@@ -33,6 +33,7 @@ export const Page1GeneralInfo: React.FC<Page1GeneralInfoProps> = ({
           value={site}
           onChangeText={(text) => onUpdateField('site', text)}
           mode="outlined"
+          defaultValue='Santarém'
           style={styles.input}
           left={<TextInput.Icon icon="map-marker" />}
         />
