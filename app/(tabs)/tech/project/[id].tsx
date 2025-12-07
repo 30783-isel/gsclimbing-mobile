@@ -14,7 +14,7 @@ import { Text, Card, IconButton, Surface, Searchbar, Chip } from 'react-native-p
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { colors, spacing } from '@/constants/theme';
-import { projectsAPI } from '@/services/api/projects.api';
+import { projectAPI } from '@/services/api/project.api';
 import { turbineAPI } from '@/services/api/turbine.api';
 import type { Project } from '@/types/project.types';
 import type { Turbine } from '@/types/turbine.types';
@@ -51,7 +51,7 @@ export default function TechProjectDetailScreen() {
       setIsLoading(true);
       console.log('📦 Carregando projeto:', id);
 
-      const projectData = await projectsAPI.getById(parseInt(id));
+      const projectData = await projectAPI.getById(parseInt(id));
       setProject(projectData);
 
       const turbinesData = await turbineAPI.getByProject(parseInt(id));
@@ -76,13 +76,14 @@ export default function TechProjectDetailScreen() {
   };
 
   const handleTurbinePress = (turbine: Turbine) => {
-    // Navegar para criar relatório desta turbina
+    // Navegar para ver relatórios desta turbina
     router.push({
-      pathname: '/(tabs)/tech/reports/defect-inspection/create',
+      pathname: '/(tabs)/tech/reports/turbine/[turbineId]',
       params: {
-        projectId: id,
-        turbineId: turbine.id.toString(),
+        turbineId: turbine.idTurbine.toString(),
         turbineName: turbine.name,
+        projectId: id,
+        projectName: project?.name || '',
       },
     });
   };
@@ -167,7 +168,7 @@ export default function TechProjectDetailScreen() {
       </View>
 
       <Text variant="titleMedium" style={styles.sectionTitle}>
-        Selecione uma turbina para criar relatório
+        Selecione uma turbina
       </Text>
     </View>
   );
@@ -188,7 +189,7 @@ export default function TechProjectDetailScreen() {
       <FlatList
         data={filteredTurbines}
         renderItem={renderTurbineCard}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item) => item.idTurbine.toString()}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmpty}
         contentContainerStyle={filteredTurbines.length === 0 ? styles.emptyListContent : undefined}
@@ -252,7 +253,7 @@ const styles = StyleSheet.create({
   infoValue: {
     fontWeight: '700',
     color: colors.primary,
-    marginTop: spacing.xs,
+    marginTop: spacing.xxs,
   },
   searchContainer: {
     paddingHorizontal: spacing.md,
