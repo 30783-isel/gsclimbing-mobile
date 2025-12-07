@@ -8,7 +8,6 @@ export default function TechLayout() {
       }}
     >
       <Stack.Screen name="index" />
-      <Stack.Screen name="reports" />
       <Stack.Screen name="project/[id]" />
     </Stack>
   );
