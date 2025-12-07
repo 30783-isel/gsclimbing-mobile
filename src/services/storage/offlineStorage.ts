@@ -40,19 +40,25 @@ class OfflineStorage {
     }
   }
 
-  async get<T>(key: string): Promise<T | null> {
-    try {
-      const jsonValue = await AsyncStorage.getItem(key);
-      return jsonValue != null ? JSON.parse(jsonValue) : null;
-
-      console.log('🔍 Raw value:', jsonValue);
-
-    } catch (error) {
-      console.error('❌ Parse error for key:', key, error);
-      await AsyncStorage.removeItem(key);
-      return null;
+async get(key: string): Promise<any> {
+  try {
+    const value = await AsyncStorage.getItem(key);
+    
+    // Debug: mostra o valor bruto
+    if (key === '@gsclimbing:last_sync') {
+      console.log('🔍 Raw value:', value);
     }
+    
+    if (!value) return null;
+    return JSON.parse(value);
+  } catch (error) {
+    console.error(`❌ Parse error for key: ${key}`, error);
+    
+    // Apaga dados corrompidos
+    await AsyncStorage.removeItem(key);
+    return null;
   }
+}
 
   
 
