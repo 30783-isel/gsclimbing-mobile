@@ -37,6 +37,7 @@ export default function TechReportsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [menuVisible, setMenuVisible] = useState<{ [key: number]: boolean }>({});
+  const [fabOpen, setFabOpen] = useState(false);
 
   // Carregar relatórios ao montar componente
   useEffect(() => {
@@ -60,7 +61,7 @@ export default function TechReportsScreen() {
   }, [reports, searchQuery]);
 
   /**
-   * Carregar todos os relatórios (aqui podes filtrar por técnico se necessário)
+   * Carregar todos os relatórios
    */
   const loadAllReports = async () => {
     try {
@@ -68,10 +69,6 @@ export default function TechReportsScreen() {
       console.log('📋 Carregando relatórios...');
 
       // TODO: Implementar endpoint que retorna todos os relatórios do técnico
-      // Por enquanto, vamos buscar de todas as turbinas (exemplo)
-      // Na prática, o backend deveria ter um endpoint: /api/reports/mobile/defect-inspection/my-reports
-
-      // Por enquanto deixo vazio - podes adicionar lógica específica
       const allReports: DefectInspectionReportResponse[] = [];
       
       setReports(allReports);
@@ -111,6 +108,14 @@ export default function TechReportsScreen() {
   };
 
   /**
+   * Navegar para seleção de projeto/turbina antes de criar
+   */
+  const handleCreateReport = () => {
+    // Navegar de volta para projetos para selecionar turbina
+    router.push('/(tabs)/tech');
+  };
+
+  /**
    * Toggle menu
    */
   const toggleMenu = (reportId: number) => {
@@ -135,8 +140,8 @@ export default function TechReportsScreen() {
           onPress: async () => {
             try {
               await defectInspectionReportAPI.delete(reportId);
+              await loadAllReports();
               Alert.alert('Sucesso', 'Relatório eliminado com sucesso');
-              loadAllReports();
             } catch (error) {
               console.error('❌ Erro ao eliminar:', error);
               Alert.alert('Erro', 'Não foi possível eliminar o relatório');
@@ -148,26 +153,22 @@ export default function TechReportsScreen() {
   };
 
   /**
-   * Renderizar card do relatório
+   * Renderizar card de relatório
    */
   const renderReportCard = ({ item }: { item: DefectInspectionReportResponse }) => (
     <Card style={styles.reportCard}>
       <TouchableOpacity onPress={() => handleReportPress(item.reportId)}>
         <Card.Content>
           <View style={styles.cardHeader}>
-            <View style={styles.cardHeaderLeft}>
-              <Text variant="titleMedium" style={styles.reportTitle}>
-                {item.wtgType || 'N/A'}
+            <View style={styles.cardTitle}>
+              <Text variant="titleMedium" style={styles.turbineText}>
+                {item.wtgNumber || 'N/A'}
               </Text>
-              <Text variant="bodySmall" style={styles.reportSubtitle}>
-                WTG {item.wtgNumber} - {item.site}
-              </Text>
-              <Text variant="bodySmall" style={styles.reportDate}>
-                {new Date(item.createDate).toLocaleDateString('pt-PT')}
+              <Text variant="bodySmall" style={styles.typeText}>
+                {item.wtgType || 'Tipo não definido'}
               </Text>
             </View>
 
-            {/* Menu de opções */}
             <Menu
               visible={menuVisible[item.reportId] || false}
               onDismiss={() => toggleMenu(item.reportId)}
@@ -184,8 +185,8 @@ export default function TechReportsScreen() {
                   toggleMenu(item.reportId);
                   handleReportPress(item.reportId);
                 }}
+                title="Ver Detalhes"
                 leadingIcon="eye"
-                title="Ver"
               />
               <Divider />
               <Menu.Item
@@ -193,23 +194,31 @@ export default function TechReportsScreen() {
                   toggleMenu(item.reportId);
                   handleDeleteReport(item.reportId);
                 }}
-                leadingIcon="delete"
                 title="Eliminar"
-                titleStyle={{ color: colors.error }}
+                leadingIcon="delete"
               />
             </Menu>
           </View>
 
-          <View style={styles.chipsContainer}>
-            <Chip icon="calendar" compact style={styles.chip}>
-              <Text variant="bodySmall" style={styles.chipText}>
-                {item.yearConstruction}
+          <View style={styles.cardDetails}>
+            <View style={styles.detailRow}>
+              <IconButton icon="map-marker" size={16} style={styles.detailIcon} />
+              <Text variant="bodySmall">{item.site || 'Local não definido'}</Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <IconButton icon="calendar" size={16} style={styles.detailIcon} />
+              <Text variant="bodySmall">
+                {item.createDate
+                  ? new Date(item.createDate).toLocaleDateString('pt-PT')
+                  : 'Data não definida'}
               </Text>
-            </Chip>
-            <Chip icon="image-multiple" compact style={styles.chip}>
-              <Text variant="bodySmall" style={styles.chipText}>
-                {item.numberPictures} {item.numberPictures === 1 ? 'foto' : 'fotos'}
-              </Text>
+            </View>
+          </View>
+
+          <View style={styles.cardFooter}>
+            <Chip icon="camera" compact>
+              {item.numberPictures} {item.numberPictures === 1 ? 'foto' : 'fotos'}
             </Chip>
           </View>
         </Card.Content>
@@ -227,7 +236,8 @@ export default function TechReportsScreen() {
         Sem relatórios
       </Text>
       <Text variant="bodyMedium" style={styles.emptyText}>
-        Ainda não criaste nenhum relatório.
+        Ainda não criaste nenhum relatório.{'\n'}
+        Clica no botão + para criar um novo.
       </Text>
     </View>
   );
@@ -297,22 +307,30 @@ export default function TechReportsScreen() {
   const Container = Platform.OS === 'web' ? View : SafeAreaView;
 
   return (
-    <Container style={styles.container} edges={Platform.OS === 'web' ? [] : ['top']}>
+    <Container style={styles.container} edges={Platform.OS === 'web' ? undefined : ['bottom']}>
       <FlatList
         data={filteredReports}
         renderItem={renderReportCard}
         keyExtractor={(item) => item.reportId.toString()}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmpty}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            colors={[colors.primary]}
-          />
-        }
-        showsVerticalScrollIndicator={false}
+        contentContainerStyle={filteredReports.length === 0 ? styles.emptyListContent : undefined}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+      />
+
+      <FAB.Group
+        open={fabOpen}
+        visible
+        icon={fabOpen ? 'close' : 'plus'}
+        actions={[
+          {
+            icon: 'wind-turbine',
+            label: 'Criar Relatório',
+            onPress: handleCreateReport,
+          },
+        ]}
+        onStateChange={({ open }) => setFabOpen(open)}
+        fabStyle={styles.fab}
       />
     </Container>
   );
@@ -322,11 +340,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    ...(Platform.OS === 'web' && {
-      maxWidth: 1200,
-      width: '100%',
-      alignSelf: 'center',
-    }),
   },
   loadingContainer: {
     flex: 1,
@@ -338,61 +351,53 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     color: colors.textSecondary,
   },
-  listContent: {
-    flexGrow: 1,
-    paddingBottom: spacing.xl,
-  },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: spacing.md,
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
     backgroundColor: colors.surface,
   },
   headerTitle: {
-    color: colors.primary,
-    fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'center',
+    fontWeight: '600',
   },
   searchContainer: {
-    padding: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
   },
   searchBar: {
-    elevation: 0,
     backgroundColor: colors.surface,
+    elevation: 0,
   },
   statsContainer: {
     flexDirection: 'row',
-    gap: spacing.md,
     paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
   },
   statBox: {
     flex: 1,
-    backgroundColor: colors.primary,
-    padding: spacing.md,
+    backgroundColor: colors.surface,
     borderRadius: 12,
+    padding: spacing.md,
     alignItems: 'center',
+    elevation: 1,
   },
   statNumber: {
-    color: colors.white,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    color: colors.primary,
   },
   statLabel: {
-    color: colors.white,
     marginTop: spacing.xs,
+    color: colors.textSecondary,
   },
   reportCard: {
     marginHorizontal: spacing.md,
-    marginVertical: spacing.sm,
-    ...(Platform.OS === 'web' && {
-      elevation: 0,
-      shadowColor: colors.black,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-    }),
+    marginBottom: spacing.sm,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -400,48 +405,54 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: spacing.sm,
   },
-  cardHeaderLeft: {
+  cardTitle: {
     flex: 1,
   },
-  reportTitle: {
+  turbineText: {
+    fontWeight: '600',
     color: colors.text,
-    fontWeight: 'bold',
-    marginBottom: spacing.xs,
   },
-  reportSubtitle: {
+  typeText: {
     color: colors.textSecondary,
-    marginBottom: spacing.xs,
+    marginTop: 2,
   },
-  reportDate: {
-    color: colors.textLight,
-    fontSize: 12,
+  cardDetails: {
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
   },
-  chipsContainer: {
+  detailRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
+    alignItems: 'center',
   },
-  chip: {
-    backgroundColor: colors.surface,
+  detailIcon: {
+    margin: 0,
+    marginRight: -spacing.xs,
   },
-  chipText: {
-    fontSize: 12,
+  cardFooter: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  emptyListContent: {
+    flexGrow: 1,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.xl,
-    marginTop: spacing.xxl,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xxl,
   },
   emptyTitle: {
-    color: colors.textSecondary,
-    marginBottom: spacing.sm,
-    textAlign: 'center',
+    marginTop: spacing.md,
+    fontWeight: '600',
+    color: colors.text,
   },
   emptyText: {
-    color: colors.textLight,
+    marginTop: spacing.sm,
     textAlign: 'center',
+    color: colors.textSecondary,
+  },
+  fab: {
+    backgroundColor: colors.primary,
   },
 });

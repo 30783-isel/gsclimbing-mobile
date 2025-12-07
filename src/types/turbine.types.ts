@@ -1,3 +1,5 @@
+// src/types/turbine.types.ts
+
 import type { Project } from './project.types';
 import type { Report } from './report.types';
 
@@ -5,8 +7,11 @@ import type { Report } from './report.types';
  * Interface da turbina
  */
 export interface Turbine {
-  id: string;
+  idTurbine: number;  // ID numérico usado no backend
+  id: string;         // ID string para compatibilidade
   name: string;
+  model?: string;     // Modelo da turbina
+  power?: string;     // Potência da turbina
   site?: string;
   number?: string;
   type?: string;
@@ -33,6 +38,8 @@ export interface Turbine {
 export interface CreateTurbineDTO {
   name: string;
   projectId: string;
+  model?: string;
+  power?: string;
   site?: string;
   number?: string;
   type?: string;
@@ -44,6 +51,8 @@ export interface CreateTurbineDTO {
  */
 export interface UpdateTurbineDTO {
   name?: string;
+  model?: string;
+  power?: string;
   site?: string;
   number?: string;
   type?: string;
@@ -63,6 +72,7 @@ export interface UpdateTurbineDTO {
  */
 export interface TurbineFilters {
   name?: string;
+  model?: string;
   site?: string;
   number?: string;
   type?: string;

@@ -1,4 +1,9 @@
-// app/reports/defect-inspection/create.tsx
+/**
+ * Rota: app/(tabs)/tech/reports/defect-inspection/create.tsx
+ * 
+ * Screen de Criação de Defect Inspection Report (Técnico)
+ * Acessível via: /(tabs)/tech/reports/defect-inspection/create?projectId=X&turbineId=Y&turbineName=Z
+ */
 
 import React, { useState } from 'react';
 import { View, StyleSheet, BackHandler } from 'react-native';
@@ -27,7 +32,7 @@ interface AdditionalField {
   value: string;
 }
 
-export default function CreateDefectInspectionReport() {
+export default function TechDefectInspectionCreateScreen() {
   const router = useRouter();
   const { projectId, turbineId, turbineName } = useLocalSearchParams<{
     projectId: string;
