@@ -137,8 +137,9 @@ class ReportSyncService {
         reportType: report.reportType,
         language: report.language,
         reportData: JSON.stringify(report.data),
-        photos: [], // ← Vazio (backend ainda não suporta isto corretamente)
+        photos: report.photos, // ← Vazio (backend ainda não suporta isto corretamente)
         createdAtDevice: report.createdAt,
+        inspectedBy: report.createdAt,
       };
 
       const response = await httpClient.post(

@@ -44,11 +44,17 @@ class OfflineStorage {
     try {
       const jsonValue = await AsyncStorage.getItem(key);
       return jsonValue != null ? JSON.parse(jsonValue) : null;
+
+      console.log('🔍 Raw value:', jsonValue);
+
     } catch (error) {
-      console.error('Error getting from offline storage:', error);
+      console.error('❌ Parse error for key:', key, error);
+      await AsyncStorage.removeItem(key);
       return null;
     }
   }
+
+  
 
   async remove(key: string): Promise<void> {
     try {
