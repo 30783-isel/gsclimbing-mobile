@@ -40,7 +40,7 @@ class OfflineStorage {
     }
   }
 
-async get(key: string): Promise<any> {
+  async get<T>(key: string): Promise<T | null> {
   try {
     const value = await AsyncStorage.getItem(key);
     
@@ -58,8 +58,7 @@ async get(key: string): Promise<any> {
     await AsyncStorage.removeItem(key);
     return null;
   }
-}
-
+  }
   
 
   async remove(key: string): Promise<void> {
