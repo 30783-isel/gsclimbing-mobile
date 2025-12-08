@@ -53,7 +53,7 @@
   "include": [
     "**/*.ts",
     "**/*.tsx"
-  ],
+, "app/(tabs)/admin/index,tsx"  ],
   "exclude": [
     "node_modules"
   ]
