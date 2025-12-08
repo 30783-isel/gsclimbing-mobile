@@ -1,17 +1,18 @@
-// app/(tabs)/tech/index.tsx - LISTA DE PROJETOS DO TÉCNICO COM NAVEGAÇÃO PARA RELATÓRIOS
-
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Platform } from 'react-native';
-import { Text, Card, Searchbar, Chip, IconButton, Surface } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, StyleSheet, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
+import { Text, Card, FAB, Searchbar, Chip, IconButton } from 'react-native-paper';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { useProjects } from '@/hooks/useProjects';
+import { ProjectFormSheet } from '@/components/ProjectFormSheet';
+import { FiltersSheet } from '@/components/FiltersSheet';
 import { SyncStatus } from '@/components/SyncStatus';
 import { colors, spacing } from '@/constants/theme';
-import type { Project } from '@/types/project.types';
+import type { Project, ProjectFilters } from '@/types/project.types';
 
-export default function TechProjectsScreen() {
+export default function AdminProjectsScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { user, handleLogout } = useAuth();
   const {
@@ -20,17 +21,27 @@ export default function TechProjectsScreen() {
     refreshing,
     loadProjects,
     refreshProjects,
+    setSelectedProject,
+    createProject,
+    editProject,
+    filterProjects,
   } = useProjects();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const [sheetMode, setSheetMode] = useState<'create' | 'edit'>('create');
+  const [selectedForEdit, setSelectedForEdit] = useState<Project | null>(null);
+  const [filtersSheetVisible, setFiltersSheetVisible] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<ProjectFilters>({});
+  const [hasActiveFilters, setHasActiveFilters] = useState(false);
 
   // Carregar projetos ao montar componente
   useEffect(() => {
     loadProjects();
   }, []);
 
-  // Filtrar projetos localmente quando muda a query
+  // Filtrar projetos localmente quando muda a query ou filtros
   useEffect(() => {
     let filtered = projects;
 
@@ -38,82 +49,156 @@ export default function TechProjectsScreen() {
     if (searchQuery.trim()) {
       filtered = filtered.filter(
         (p) =>
-          p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.country?.toLowerCase().includes(searchQuery.toLowerCase())
+          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.country.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.location.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
     setFilteredProjects(filtered);
-  }, [projects, searchQuery]);
+  }, [searchQuery, projects]);
+
+  // Verificar se há filtros ativos
+  useEffect(() => {
+    const hasFilters = Object.values(activeFilters).some(
+      (value) => value && value.trim() !== ''
+    );
+    setHasActiveFilters(hasFilters);
+  }, [activeFilters]);
 
   const handleProjectPress = (project: Project) => {
-    // Navegar para detalhes do projeto / turbinas
-    router.push({
-      pathname: '/(tabs)/tech/project/[id]',
-      params: { id: project.idProject },
-    });
+    setSelectedProject(project);
+    router.push(`/(tabs)/admin/project/${project.idProject}`);
+  };
+
+  const handleCreateProject = () => {
+    setSheetMode('create');
+    setSelectedForEdit(null);
+    setSheetVisible(true);
+  };
+
+  const handleEditProject = (project: Project, event: any) => {
+    event?.stopPropagation();
+    setSheetMode('edit');
+    setSelectedForEdit(project);
+    setSheetVisible(true);
+  };
+
+  const handleFormSubmit = async (data: any) => {
+    if (sheetMode === 'create') {
+      await createProject(data);
+    } else if (selectedForEdit) {
+      await editProject(selectedForEdit.idProject, data);
+    }
+    await loadProjects();
+  };
+
+  const handleApplyFilters = async (filters: ProjectFilters) => {
+    setActiveFilters(filters);
+    await filterProjects(filters);
+  };
+
+  const handleClearFilters = async () => {
+    setActiveFilters({});
+    await loadProjects();
   };
 
   const renderProjectCard = ({ item }: { item: Project }) => (
-    <Card style={styles.projectCard} onPress={() => handleProjectPress(item)}>
-      <Card.Content>
-        <View style={styles.cardHeader}>
-          <View style={styles.cardHeaderLeft}>
-            <Text variant="titleMedium" style={styles.projectName}>
-              {item.name}
-            </Text>
-            <View style={styles.locationContainer}>
-              <IconButton icon="map-marker" size={16} style={{ margin: 0 }} />
-              <Text variant="bodySmall" style={styles.locationText}>
-                {item.location}, {item.country}
+    <TouchableOpacity
+      onPress={() => handleProjectPress(item)}
+      activeOpacity={0.7}
+    >
+      <Card style={styles.projectCard}>
+        <Card.Content>
+          {/* Header do Card */}
+          <View style={styles.cardHeader}>
+            <View style={styles.cardHeaderLeft}>
+              <Text variant="titleLarge" style={styles.projectName}>
+                {item.name}
               </Text>
+              <View style={styles.locationContainer}>
+                <Text variant="bodyMedium" style={styles.locationText}>
+                  📍 {item.location}, {item.country}
+                </Text>
+              </View>
             </View>
+            <IconButton
+              icon="chevron-right"
+              size={24}
+              iconColor={colors.primary}
+            />
+            <IconButton
+              icon="pencil"
+              size={20}
+              iconColor={colors.primary}
+              onPress={(e) => handleEditProject(item, e)}
+            />
           </View>
-        </View>
 
-        <View style={styles.chipsContainer}>
-          <Chip icon="map" compact style={styles.chip}>
-            <Text variant="bodySmall" style={styles.chipText}>
-              Site: {item.site || 'N/A'}
-            </Text>
-          </Chip>
-          <Chip icon="wind-turbine" compact style={styles.chip}>
-            <Text variant="bodySmall" style={styles.chipText}>
-              {item.numberTurbines} {parseInt(item.numberTurbines || '0') === 1 ? 'Turbina' : 'Turbinas'}
-            </Text>
-          </Chip>
-        </View>
-      </Card.Content>
-    </Card>
+          {/* Info Chips */}
+          <View style={styles.chipsContainer}>
+            <Chip
+              icon="wind-turbine"
+              style={styles.chip}
+              textStyle={styles.chipText}
+            >
+              {item.numberTurbines} {t('GSCLIMBING.TURBINES')}
+            </Chip>
+            
+            {item.site && (
+              <Chip
+                icon="map-marker"
+                style={styles.chip}
+                textStyle={styles.chipText}
+              >
+                {item.site}
+              </Chip>
+            )}
+          </View>
+
+          {/* Metadados */}
+          <View style={styles.metadataContainer}>
+            {item.type && (
+              <Text variant="bodySmall" style={styles.metadata}>
+                Tipo: {item.type}
+              </Text>
+            )}
+            {item.number && (
+              <Text variant="bodySmall" style={styles.metadata}>
+                Nº: {item.number}
+              </Text>
+            )}
+          </View>
+        </Card.Content>
+      </Card>
+    </TouchableOpacity>
   );
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
-      <IconButton icon="folder-outline" size={64} iconColor={colors.lightGray} />
-      <Text variant="titleMedium" style={styles.emptyTitle}>
-        Nenhum projeto atribuído
+      <Text variant="headlineSmall" style={styles.emptyTitle}>
+        📂 Nenhum projeto encontrado
       </Text>
       <Text variant="bodyMedium" style={styles.emptyText}>
-        Não tens projetos atribuídos neste momento.
+        {searchQuery
+          ? 'Tente uma pesquisa diferente'
+          : 'Adicione o primeiro projeto'}
       </Text>
     </View>
   );
 
   const renderHeader = () => (
-    <View>
-      {/* Header com Sync Status e Botão de Relatórios */}
-      <Surface style={styles.header} elevation={2}>
-        <Text variant="headlineSmall" style={styles.headerTitle}>
-          Meus Projetos
-        </Text>
+    <View style={styles.header}>
+      <View style={styles.headerTop}>
+        <View>
+          <Text variant="headlineMedium" style={styles.title}>
+            {t('GSCLIMBING.PROJECTS')}
+          </Text>
+          <Text variant="bodyMedium" style={styles.subtitle}>
+            Olá, {user?.username}! 👋
+          </Text>
+        </View>
         <View style={styles.headerRight}>
-          <IconButton
-            icon="file-document-multiple"
-            size={24}
-            iconColor={colors.primary}
-            onPress={() => router.push('/(tabs)/tech/reports')}
-          />
           <SyncStatus />
           <IconButton
             icon="logout"
@@ -122,17 +207,54 @@ export default function TechProjectsScreen() {
             onPress={handleLogout}
           />
         </View>
-      </Surface>
+      </View>
 
-      {/* Search Bar */}
+      {/* Searchbar */}
       <View style={styles.searchContainer}>
         <Searchbar
-          placeholder="Pesquisar projetos..."
+          placeholder={t('GSCLIMBING.SEARCH')}
           onChangeText={setSearchQuery}
           value={searchQuery}
-          style={styles.searchBar}
+          style={styles.searchbar}
+          iconColor={colors.primary}
+        />
+        <IconButton
+          icon={hasActiveFilters ? 'filter' : 'filter-outline'}
+          size={24}
+          iconColor={hasActiveFilters ? colors.primary : colors.textSecondary}
+          style={[
+            styles.filterButton,
+            hasActiveFilters && styles.filterButtonActive,
+          ]}
+          onPress={() => setFiltersSheetVisible(true)}
         />
       </View>
+
+      {/* Active Filters Chips */}
+      {hasActiveFilters && (
+        <View style={styles.activeFiltersContainer}>
+          {Object.entries(activeFilters).map(([key, value]) =>
+            value ? (
+              <Chip
+                key={key}
+                onClose={handleClearFilters}
+                style={styles.filterChip}
+                textStyle={styles.filterChipText}
+              >
+                {value}
+              </Chip>
+            ) : null
+          )}
+          <Chip
+            icon="close-circle"
+            onPress={handleClearFilters}
+            style={styles.clearFiltersChip}
+            textStyle={styles.clearFiltersText}
+          >
+            Limpar
+          </Chip>
+        </View>
+      )}
 
       {/* Stats */}
       <View style={styles.statsContainer}>
@@ -141,27 +263,24 @@ export default function TechProjectsScreen() {
             {projects.length}
           </Text>
           <Text variant="bodySmall" style={styles.statLabel}>
-            Projetos
+            {t('GSCLIMBING.PROJECTS')}
           </Text>
         </View>
-
+        
         <View style={styles.statBox}>
           <Text variant="headlineSmall" style={styles.statNumber}>
             {projects.reduce((acc, p) => acc + parseInt(p.numberTurbines || '0'), 0)}
           </Text>
           <Text variant="bodySmall" style={styles.statLabel}>
-            Turbinas
+            {t('GSCLIMBING.TURBINES')}
           </Text>
         </View>
       </View>
     </View>
   );
 
-  // ✅ FIX: Usa View em vez de SafeAreaView na web
-  const Container = Platform.OS === 'web' ? View : SafeAreaView;
-
   return (
-    <Container style={styles.container} edges={Platform.OS === 'web' ? [] : ['top']}>
+    <View style={styles.container}>
       <FlatList
         data={filteredProjects}
         renderItem={renderProjectCard}
@@ -178,7 +297,34 @@ export default function TechProjectsScreen() {
         }
         showsVerticalScrollIndicator={false}
       />
-    </Container>
+
+      {/* FAB - Adicionar Projeto */}
+      <FAB
+        icon="plus"
+        label={t('GSCLIMBING.ADD')}
+        style={styles.fab}
+        onPress={handleCreateProject}
+        color="#fff"
+      />
+
+      {/* Bottom Sheet Form */}
+      <ProjectFormSheet
+        visible={sheetVisible}
+        onDismiss={() => setSheetVisible(false)}
+        onSubmit={handleFormSubmit}
+        project={selectedForEdit}
+        mode={sheetMode}
+      />
+
+      {/* Filters Sheet */}
+      <FiltersSheet
+        visible={filtersSheetVisible}
+        onDismiss={() => setFiltersSheetVisible(false)}
+        onApply={handleApplyFilters}
+        initialFilters={activeFilters}
+        resultCount={filteredProjects.length}
+      />
+    </View>
   );
 }
 
@@ -186,46 +332,77 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    ...(Platform.OS === 'web' && {
-      maxWidth: 1200,
-      width: '100%',
-      alignSelf: 'center',
-    }),
   },
   listContent: {
     flexGrow: 1,
-    paddingBottom: spacing.xl,
+    paddingBottom: 80,
   },
   header: {
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-  },
-  headerTitle: {
-    color: colors.primary,
-    fontWeight: 'bold',
+    marginBottom: spacing.md,
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
   },
-  searchContainer: {
-    padding: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
+  title: {
+    color: colors.text,
+    fontWeight: 'bold',
   },
-  searchBar: {
+  subtitle: {
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  searchbar: {
+    flex: 1,
     elevation: 0,
+    backgroundColor: colors.background,
+  },
+  filterButton: {
+    margin: 0,
     backgroundColor: colors.surface,
+  },
+  filterButtonActive: {
+    backgroundColor: colors.primary + '20',
+  },
+  activeFiltersContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  filterChip: {
+    backgroundColor: colors.primary + '20',
+  },
+  filterChipText: {
+    color: colors.primary,
+    fontSize: 12,
+  },
+  clearFiltersChip: {
+    backgroundColor: colors.error + '20',
+  },
+  clearFiltersText: {
+    color: colors.error,
+    fontSize: 12,
   },
   statsContainer: {
     flexDirection: 'row',
     gap: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
   },
   statBox: {
     flex: 1,
@@ -245,13 +422,7 @@ const styles = StyleSheet.create({
   projectCard: {
     marginHorizontal: spacing.md,
     marginVertical: spacing.sm,
-    ...(Platform.OS === 'web' && {
-      elevation: 0,
-      shadowColor: colors.black,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-    }),
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -278,13 +449,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-    marginTop: spacing.sm,
+    marginVertical: spacing.sm,
   },
   chip: {
     backgroundColor: colors.surface,
   },
   chipText: {
     fontSize: 12,
+  },
+  metadataContainer: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.xs,
+  },
+  metadata: {
+    color: colors.textLight,
   },
   emptyContainer: {
     flex: 1,
@@ -301,5 +480,12 @@ const styles = StyleSheet.create({
   emptyText: {
     color: colors.textLight,
     textAlign: 'center',
+  },
+  fab: {
+    position: 'absolute',
+    margin: spacing.md,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.primary,
   },
 });

@@ -1,13 +1,13 @@
 import { Stack } from 'expo-router';
 
-export default function AdminLayout() {
+export default function ProjectLayout() {
   return (
     <Stack
       screenOptions={{
         headerShown: false,
       }}
     >
-      <Stack.Screen name="index" />
+      <Stack.Screen name="[id]" />
     </Stack>
   );
 }
