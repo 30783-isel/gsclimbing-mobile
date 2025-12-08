@@ -4,13 +4,20 @@ import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicato
 import { Text, Card, IconButton, Chip, Portal, Dialog, Button, Banner } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { projectsAPI } from '@/services/api/projects.api';
+import { dataCacheService } from '@/services/storage/dataCache.service';
 import { colors, spacing } from '@/constants/theme';
 import { ReportType, REPORT_TYPE_NAMES } from '@/types';
 import type { Turbine } from '@/types/turbine.types';
 import type { Project } from '@/types/project.types';
 import { useAuthStore } from '@/store/authStore';
 import NetInfo from '@react-native-community/netinfo';
+
+const CACHE_KEYS = {
+  PROJECTS: '@cache:projects',
+  TURBINES: '@cache:turbines',
+};
 
 export default function TurbineDetailsScreen() {
   const { id, turbineId } = useLocalSearchParams<{ id: string; turbineId: string }>();
@@ -79,52 +86,183 @@ export default function TurbineDetailsScreen() {
       
       setIsLoading(true);
       setLoadError(null);
+
+      let turbineData: Turbine | null = null;
+      let projectData: Project | null = null;
+      let loadedFromCache = false;
       
-      // Tentar carregar turbina
-      console.log(`🔍 Buscando turbina ID: ${turbineId}`);
-      const turbineData = await projectsAPI.getTurbineById(turbineId);
-      console.log('✅ Turbina carregada:', turbineData?.name || 'sem nome');
+      // ======== TENTAR API PRIMEIRO (se online) ========
+      if (isOnline) {
+        console.log('🌐 ONLINE - Tentando carregar da API...');
+        
+        try {
+          // Tentar carregar turbina da API
+          console.log(`🔍 Buscando turbina ID: ${turbineId}`);
+          turbineData = await projectsAPI.getTurbineById(turbineId);
+          console.log('✅ Turbina carregada da API:', turbineData?.name);
+          
+          // Tentar carregar projeto da API
+          console.log(`🔍 Buscando projeto ID: ${id}`);
+          projectData = await projectsAPI.getById(Number(id));
+          console.log('✅ Projeto carregado da API:', projectData?.name);
+          
+          // 💾 FAZER CACHE dos dados para uso offline
+          if (turbineData && projectData) {
+            console.log('💾 Guardando dados em cache...');
+            
+            try {
+              // Cache das turbinas do projeto
+              await dataCacheService.cacheTurbines(Number(id));
+              console.log('✅ Turbinas guardadas em cache');
+              
+              // Cache do projeto
+              const existingCache = await AsyncStorage.getItem(CACHE_KEYS.PROJECTS);
+              let projects = existingCache ? JSON.parse(existingCache) : [];
+              
+              // Atualizar ou adicionar projeto
+              const projectIndex = projects.findIndex((p: any) => 
+                p.idProject === projectData.idProject || 
+                p.idProject.toString() === projectData.idProject.toString()
+              );
+              
+              if (projectIndex >= 0) {
+                projects[projectIndex] = projectData;
+                console.log('✅ Projeto atualizado no cache');
+              } else {
+                projects.push(projectData);
+                console.log('✅ Projeto adicionado ao cache');
+              }
+              
+              await AsyncStorage.setItem(CACHE_KEYS.PROJECTS, JSON.stringify(projects));
+              console.log('💾 Cache completo guardado com sucesso!');
+              
+            } catch (cacheError) {
+              console.error('⚠️ Erro ao guardar cache (não crítico):', cacheError);
+              // Não bloquear se cache falhar
+            }
+          }
+          
+        } catch (apiError: any) {
+          console.error('❌ Erro na API:', apiError.message);
+          
+          // 🔧 DETECTAR ERROS DE REDE (mesmo quando NetInfo diz "online")
+          const isNetworkError = 
+            apiError.message?.includes('Network') ||
+            apiError.message?.includes('timeout') ||
+            apiError.message?.includes('conexão') ||
+            apiError.message?.includes('Internet') ||
+            apiError.code === 'ECONNABORTED' ||
+            apiError.code === 'ERR_NETWORK' ||
+            apiError.code === 'OFFLINE' ||
+            !apiError.response; // Sem resposta = problema de rede
+          
+          if (isNetworkError) {
+            console.log('📵 Erro de REDE detectado - tentando CACHE como fallback...');
+            // NÃO fazer throw - continuar para tentar cache
+          } else {
+            // Outro tipo de erro (ex: 404, 500)
+            throw apiError;
+          }
+        }
+      }
+      
+      // ======== USAR CACHE SE: offline OU erro de rede ========
+      if (!turbineData) {
+        console.log('📵 Carregando do CACHE...');
+        console.log('🔍 DEBUG: Tentando buscar turbinas do projeto:', id);
+        
+        try {
+          // Carregar turbinas do cache
+          const cachedTurbines = await dataCacheService.getTurbines(Number(id));
+          console.log(`📦 Cache: ${cachedTurbines.length} turbinas encontradas`);
+          
+          if (cachedTurbines.length > 0) {
+            console.log('🔍 DEBUG: IDs das turbinas no cache:', cachedTurbines.map(t => ({ id: t.id, idTurbine: t.idTurbine, name: t.name })));
+            console.log('🔍 DEBUG: Procurando turbineId:', turbineId, 'Tipo:', typeof turbineId);
+          }
+          
+          // Procurar turbina específica no cache
+          turbineData = cachedTurbines.find(t => {
+            const match = t.id === turbineId || 
+                         t.id === String(turbineId) ||
+                         t.idTurbine === Number(turbineId) ||
+                         String(t.idTurbine) === turbineId;
+            console.log(`🔍 Comparando: t.id=${t.id} (${typeof t.id}), t.idTurbine=${t.idTurbine} (${typeof t.idTurbine}), target=${turbineId} (${typeof turbineId}), match=${match}`);
+            return match;
+          }) || null;
+          
+          if (turbineData) {
+            console.log('✅ Turbina encontrada no cache:', turbineData.name);
+            loadedFromCache = true;
+          } else {
+            console.log('⚠️ Turbina NÃO encontrada no cache');
+            console.log('⚠️ DEBUG: Cache vazio ou ID não corresponde');
+          }
+        } catch (cacheError) {
+          console.error('❌ Erro ao ler do cache:', cacheError);
+        }
+        
+        // Carregar projeto do cache
+        try {
+          const cached = await AsyncStorage.getItem(CACHE_KEYS.PROJECTS);
+          console.log('🔍 DEBUG: Projetos no cache:', cached ? 'existem' : 'vazio');
+          
+          const cachedProjects = cached ? JSON.parse(cached) : [];
+          console.log('🔍 DEBUG: Número de projetos no cache:', cachedProjects.length);
+          
+          projectData = cachedProjects.find(p => 
+            p.idProject === Number(id) || p.idProject.toString() === id
+          ) || null;
+          
+          if (projectData) {
+            console.log('✅ Projeto encontrado no cache:', projectData.name);
+          } else {
+            console.log('⚠️ Projeto NÃO encontrado no cache');
+          }
+        } catch (projCacheError) {
+          console.error('❌ Erro ao ler projetos do cache:', projCacheError);
+        }
+      }
+      
+      // ======== VERIFICAR SE CONSEGUIU CARREGAR ========
+      if (!turbineData) {
+        throw new Error(
+          'Turbina não disponível. ' + 
+          (isOnline 
+            ? 'Erro ao carregar do servidor.' 
+            : 'Conecte-se à internet e abra esta turbina primeiro para acedê-la offline.')
+        );
+      }
+      
+      // Atualizar estados
       setTurbine(turbineData);
-      
-      // Tentar carregar projeto
-      console.log(`🔍 Buscando projeto ID: ${id}`);
-      const projectData = await projectsAPI.getById(Number(id));
-      console.log('✅ Projeto carregado:', projectData?.name || 'sem nome');
       setProject(projectData);
       
-      console.log('✅ Todos os dados carregados com sucesso!');
+      if (loadedFromCache) {
+        console.log('✅ Dados carregados do CACHE (modo offline)');
+      } else {
+        console.log('✅ Dados carregados da API (modo online)');
+      }
       
     } catch (error: any) {
-      console.error('❌ ERRO ao carregar dados:', {
+      console.error('❌ ERRO FINAL ao carregar dados:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
+        isOnline,
       });
       
-      const errorMessage = error.response?.data?.message || error.message || 'Erro desconhecido';
+      const errorMessage = error.message || 'Erro desconhecido';
       setLoadError(errorMessage);
       
-      // Se estiver offline, mostrar mensagem específica
-      if (!isOnline || error.message?.includes('Network') || error.message?.includes('timeout')) {
-        console.log('📵 Erro de rede detectado - modo offline');
-        Alert.alert(
-          'Sem Conexão',
-          'Não foi possível carregar os dados da turbina. Verifique sua conexão com a internet.',
-          [
-            { text: 'Tentar Novamente', onPress: () => loadData() },
-            { text: 'Voltar', onPress: () => router.back(), style: 'cancel' }
-          ]
-        );
-      } else {
-        Alert.alert(
-          'Erro ao Carregar',
-          `Não foi possível carregar os dados: ${errorMessage}`,
-          [
-            { text: 'Tentar Novamente', onPress: () => loadData() },
-            { text: 'Voltar', onPress: () => router.back(), style: 'cancel' }
-          ]
-        );
-      }
+      Alert.alert(
+        'Erro ao Carregar',
+        errorMessage,
+        [
+          { text: 'Tentar Novamente', onPress: () => loadData() },
+          { text: 'Voltar', onPress: () => router.back(), style: 'cancel' }
+        ]
+      );
     } finally {
       setIsLoading(false);
       console.log('🏁 LoadData finalizado');
