@@ -84,6 +84,58 @@ export default function TurbineDetailsScreen() {
         isOnline 
       });
       
+      // 🔍 ===== DEBUG COMPLETO DO CACHE =====
+      console.log('\n🔍 DEBUG: Verificando AsyncStorage...');
+      try {
+        const allKeys = await AsyncStorage.getAllKeys();
+        const cacheKeys = allKeys.filter(k => k.includes('cache'));
+        console.log('📋 Keys de cache encontradas:', cacheKeys);
+        
+        // Debug turbinas
+        const turbineKeys = allKeys.filter(k => k.includes('turbine'));
+        console.log('🔧 Keys com "turbine":', turbineKeys);
+        
+        for (const key of turbineKeys) {
+          const value = await AsyncStorage.getItem(key);
+          if (value) {
+            try {
+              const parsed = JSON.parse(value);
+              console.log(`\n🔑 ${key}:`);
+              if (Array.isArray(parsed)) {
+                console.log(`   📦 ${parsed.length} turbinas`);
+                if (parsed.length > 0) {
+                  console.log(`   🆔 IDs: ${parsed.map((t: any) => `${t.id}(${typeof t.id})|${t.idTurbine}(${typeof t.idTurbine})`).slice(0, 3).join(', ')}`);
+                }
+              }
+            } catch (e) {
+              console.log(`   ❌ Erro parse: ${e.message}`);
+            }
+          }
+        }
+        
+        // Debug projetos
+        const projValue = await AsyncStorage.getItem('@cache:projects');
+        if (projValue) {
+          const projects = JSON.parse(projValue);
+          console.log(`\n🔑 @cache:projects: ${projects.length} projetos`);
+          console.log(`   🆔 IDs: ${projects.map((p: any) => p.idProject).join(', ')}`);
+        }
+        
+        console.log(`\n📍 Estou a procurar:`);
+        console.log(`   projectId: "${id}" (${typeof id})`);
+        console.log(`   turbineId: "${turbineId}" (${typeof turbineId})`);
+        console.log(`   Key esperada: "@cache:turbines_${id}"`);
+        
+        // Testar se a key existe
+        const expectedKey = `@cache:turbines_${id}`;
+        const testValue = await AsyncStorage.getItem(expectedKey);
+        console.log(`   Existe? ${testValue ? 'SIM ✅' : 'NÃO ❌'}`);
+        
+      } catch (debugError) {
+        console.error('❌ Erro no debug:', debugError);
+      }
+      console.log('🔍 ===== FIM DEBUG =====\n');
+      
       setIsLoading(true);
       setLoadError(null);
 
