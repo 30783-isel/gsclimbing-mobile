@@ -26,7 +26,7 @@ export interface OfflineReport {
 export interface OfflinePhoto {
   tempId: string;
   uri: string;                       // URI local da foto
-  base64?: string;                   // Dados em base64 (opcional)
+  base64Data?: string;                   // Dados em base64 (opcional)
   filename: string;
   mimeType: string;
   size?: number;
