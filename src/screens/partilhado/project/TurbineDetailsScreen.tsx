@@ -1,11 +1,10 @@
 // src/screens/partilhado/project/TurbineDetailsScreen.tsx
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { Text, Card, IconButton, FAB, Chip, Portal, Dialog, Button, Banner } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { Text, Card, IconButton, Chip, Portal, Dialog, Button, Banner } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { projectsAPI } from '@/services/api/projects.api';
-import { useOfflineReports } from '@/hooks/useOfflineReports';
 import { colors, spacing } from '@/constants/theme';
 import { ReportType, REPORT_TYPE_NAMES } from '@/types';
 import type { Turbine } from '@/types/turbine.types';
@@ -19,20 +18,24 @@ export default function TurbineDetailsScreen() {
   const { t } = useTranslation();
   const { role } = useAuthStore();
   
+  // Validar parâmetros
+  useEffect(() => {
+    console.log('📋 TurbineDetailsScreen montado com parâmetros:', { id, turbineId, role });
+    
+    if (!id || !turbineId) {
+      console.error('❌ Parâmetros inválidos!', { id, turbineId });
+      Alert.alert('Erro', 'Parâmetros inválidos', [
+        { text: 'Voltar', onPress: () => router.back() }
+      ]);
+    }
+  }, [id, turbineId]);
+  
   const [turbine, setTurbine] = useState<Turbine | null>(null);
   const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
-
-  // Hook offline para relatórios
-  const {
-    reports,
-    isOnline: reportsOnline,
-    loading: reportsLoading,
-    error: reportsError,
-    refresh: refreshReports,
-  } = useOfflineReports(parseInt(turbineId));
 
   const isAdmin = role === 'ADMIN';
   const basePath = isAdmin ? '/(tabs)/admin' : '/(tabs)/tech';
@@ -40,44 +43,128 @@ export default function TurbineDetailsScreen() {
   // Monitorar conexão
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
-      setIsOnline(state.isConnected ?? false);
+      const wasOnline = isOnline;
+      const nowOnline = state.isConnected ?? false;
+      setIsOnline(nowOnline);
+      
+      console.log(`📡 Estado de conexão: ${nowOnline ? 'ONLINE' : 'OFFLINE'}`);
+      
+      // Se ficou online, tentar recarregar
+      if (!wasOnline && nowOnline && loadError) {
+        console.log('🔄 Ficou online - tentando recarregar...');
+        loadData();
+      }
     });
     return unsubscribe;
-  }, []);
+  }, [isOnline, loadError]);
 
   useEffect(() => {
-    loadData();
+    if (id && turbineId) {
+      loadData();
+    }
   }, [turbineId, id]);
 
   const loadData = async () => {
+    if (!id || !turbineId) {
+      console.error('❌ Faltam parâmetros para carregar dados');
+      return;
+    }
+
     try {
+      console.log('🔄 TurbineDetailsScreen - Iniciando carregamento...', { 
+        turbineId, 
+        projectId: id,
+        isOnline 
+      });
+      
       setIsLoading(true);
+      setLoadError(null);
+      
+      // Tentar carregar turbina
+      console.log(`🔍 Buscando turbina ID: ${turbineId}`);
       const turbineData = await projectsAPI.getTurbineById(turbineId);
-      const projectData = await projectsAPI.getById(Number(id));
+      console.log('✅ Turbina carregada:', turbineData?.name || 'sem nome');
       setTurbine(turbineData);
+      
+      // Tentar carregar projeto
+      console.log(`🔍 Buscando projeto ID: ${id}`);
+      const projectData = await projectsAPI.getById(Number(id));
+      console.log('✅ Projeto carregado:', projectData?.name || 'sem nome');
       setProject(projectData);
-    } catch (error) {
-      console.error('Error loading data:', error);
+      
+      console.log('✅ Todos os dados carregados com sucesso!');
+      
+    } catch (error: any) {
+      console.error('❌ ERRO ao carregar dados:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      
+      const errorMessage = error.response?.data?.message || error.message || 'Erro desconhecido';
+      setLoadError(errorMessage);
+      
+      // Se estiver offline, mostrar mensagem específica
+      if (!isOnline || error.message?.includes('Network') || error.message?.includes('timeout')) {
+        console.log('📵 Erro de rede detectado - modo offline');
+        Alert.alert(
+          'Sem Conexão',
+          'Não foi possível carregar os dados da turbina. Verifique sua conexão com a internet.',
+          [
+            { text: 'Tentar Novamente', onPress: () => loadData() },
+            { text: 'Voltar', onPress: () => router.back(), style: 'cancel' }
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Erro ao Carregar',
+          `Não foi possível carregar os dados: ${errorMessage}`,
+          [
+            { text: 'Tentar Novamente', onPress: () => loadData() },
+            { text: 'Voltar', onPress: () => router.back(), style: 'cancel' }
+          ]
+        );
+      }
     } finally {
       setIsLoading(false);
+      console.log('🏁 LoadData finalizado');
     }
   };
 
   const handleBack = () => {
+    console.log('⬅️ Voltando...');
     router.back();
   };
 
   const handleEdit = () => {
+    if (!isOnline) {
+      Alert.alert(
+        'Modo Offline',
+        'Não é possível editar turbinas em modo offline.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
     router.push(`${basePath}/project/${id}/turbine/${turbineId}/edit` as any);
   };
 
   const handleDelete = async () => {
+    if (!isOnline) {
+      Alert.alert(
+        'Modo Offline',
+        'Não é possível eliminar turbinas em modo offline.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
     try {
       await projectsAPI.deleteTurbine(turbineId);
       setDeleteDialogVisible(false);
       router.back();
     } catch (error) {
       console.error('Error deleting turbine:', error);
+      Alert.alert('Erro', 'Não foi possível eliminar a turbina');
     }
   };
 
@@ -180,10 +267,50 @@ export default function TurbineDetailsScreen() {
     },
   ] : [];
 
-  if (isLoading || !turbine) {
+  // Estado de Loading
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>A carregar...</Text>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: 16, color: colors.textSecondary }}>
+          A carregar turbina...
+        </Text>
+      </View>
+    );
+  }
+
+  // Estado de Erro
+  if (loadError && !turbine) {
+    return (
+      <View style={styles.errorContainer}>
+        <IconButton icon="alert-circle" size={64} iconColor={colors.error} />
+        <Text variant="titleMedium" style={styles.errorTitle}>
+          Erro ao Carregar
+        </Text>
+        <Text variant="bodyMedium" style={styles.errorText}>
+          {loadError}
+        </Text>
+        <Button mode="contained" onPress={() => loadData()} style={{ marginTop: 16 }}>
+          Tentar Novamente
+        </Button>
+        <Button mode="text" onPress={() => router.back()} style={{ marginTop: 8 }}>
+          Voltar
+        </Button>
+      </View>
+    );
+  }
+
+  // Sem dados da turbina
+  if (!turbine) {
+    return (
+      <View style={styles.errorContainer}>
+        <IconButton icon="wind-turbine" size={64} iconColor={colors.textSecondary} />
+        <Text variant="titleMedium" style={styles.errorTitle}>
+          Turbina não encontrada
+        </Text>
+        <Button mode="text" onPress={() => router.back()} style={{ marginTop: 16 }}>
+          Voltar
+        </Button>
       </View>
     );
   }
@@ -232,7 +359,7 @@ export default function TurbineDetailsScreen() {
             icon="wifi-off"
             style={styles.offlineBanner}
           >
-            📵 Modo Offline - Pode visualizar e editar relatórios já carregados
+            📵 Modo Offline - Funcionalidades limitadas
           </Banner>
         )}
 
@@ -260,10 +387,20 @@ export default function TurbineDetailsScreen() {
           </Card>
         </View>
 
+        {/* Botão Ver Relatórios Existentes */}
+        <Button
+          mode="contained"
+          icon="file-document-multiple"
+          onPress={handleViewReports}
+          style={styles.viewReportsButton}
+        >
+          Ver Relatórios Defect Inspection
+        </Button>
+
         {/* Relatórios Disponíveis */}
         <View style={styles.section}>
           <Text variant="titleMedium" style={styles.sectionTitle}>
-            Relatórios Disponíveis
+            Criar Novo Relatório
           </Text>
 
           {reportAvailability.map((report) => (
@@ -274,85 +411,55 @@ export default function TurbineDetailsScreen() {
                 !report.available && styles.reportCardDisabled,
               ]}
             >
-              <Card.Content>
-                <View style={styles.reportCardContent}>
-                  <View style={styles.reportCardLeft}>
-                    <IconButton
-                      icon={report.icon}
-                      size={24}
-                      iconColor={report.available ? report.color : colors.textLight}
-                    />
-                    <View>
-                      <Text
-                        variant="bodyLarge"
-                        style={[
-                          styles.reportName,
-                          !report.available && styles.reportNameDisabled,
-                        ]}
-                      >
-                        {report.name}
-                      </Text>
-                      {report.available && (
-                        <Chip
-                          mode="flat"
-                          style={styles.availableChip}
-                          textStyle={styles.availableChipText}
-                        >
-                          Disponível
-                        </Chip>
-                      )}
-                    </View>
-                  </View>
-
-                  {report.available && (
-                    <View style={styles.reportActions}>
+              <TouchableOpacity
+                onPress={() => handleCreateReport(report.type)}
+                disabled={!report.available || !isOnline}
+              >
+                <Card.Content>
+                  <View style={styles.reportCardContent}>
+                    <View style={styles.reportCardLeft}>
                       <IconButton
-                        icon="eye"
-                        size={20}
-                        iconColor={colors.primary}
-                        onPress={handleViewReports}
+                        icon={report.icon}
+                        size={24}
+                        iconColor={report.available ? report.color : colors.disabled}
                       />
-                      {isOnline && (
-                        <IconButton
-                          icon="plus-circle"
-                          size={20}
-                          iconColor={colors.primary}
-                          onPress={() => handleCreateReport(report.type)}
-                        />
-                      )}
+                      <View style={styles.reportInfo}>
+                        <Text
+                          variant="bodyLarge"
+                          style={[
+                            styles.reportName,
+                            !report.available && styles.reportNameDisabled,
+                          ]}
+                        >
+                          {report.name}
+                        </Text>
+                        <Chip
+                          compact
+                          style={[
+                            styles.statusChip,
+                            report.available && styles.statusChipAvailable,
+                          ]}
+                        >
+                          {report.available ? 'Disponível' : 'Não Disponível'}
+                        </Chip>
+                      </View>
                     </View>
-                  )}
-                </View>
-              </Card.Content>
+                    {report.available && isOnline && (
+                      <IconButton
+                        icon="chevron-right"
+                        size={24}
+                        iconColor={colors.textSecondary}
+                      />
+                    )}
+                  </View>
+                </Card.Content>
+              </TouchableOpacity>
             </Card>
           ))}
         </View>
-
-        {/* Estatísticas de Relatórios */}
-        {reports.length > 0 && (
-          <View style={styles.section}>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
-              Estatísticas
-            </Text>
-            <Card style={styles.statsCard}>
-              <Card.Content>
-                <View style={styles.statsRow}>
-                  <View style={styles.statItem}>
-                    <Text variant="headlineSmall" style={styles.statNumber}>
-                      {reports.length}
-                    </Text>
-                    <Text variant="bodySmall" style={styles.statLabel}>
-                      {reportsOnline ? 'Relatórios' : 'Relatórios (cache)'}
-                    </Text>
-                  </View>
-                </View>
-              </Card.Content>
-            </Card>
-          </View>
-        )}
       </ScrollView>
 
-      {/* Delete Dialog */}
+      {/* Dialog de Confirmação Delete */}
       <Portal>
         <Dialog
           visible={deleteDialogVisible}
@@ -360,11 +467,21 @@ export default function TurbineDetailsScreen() {
         >
           <Dialog.Title>Eliminar Turbina</Dialog.Title>
           <Dialog.Content>
-            <Text>Tem a certeza que deseja eliminar esta turbina?</Text>
+            <Text>
+              Tem a certeza que deseja eliminar a turbina "{turbine.name}"?
+            </Text>
+            <Text style={{ marginTop: 8, color: colors.error }}>
+              Esta ação não pode ser desfeita.
+            </Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setDeleteDialogVisible(false)}>Cancelar</Button>
-            <Button onPress={handleDelete} textColor={colors.error}>
+            <Button onPress={() => setDeleteDialogVisible(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onPress={handleDelete}
+              textColor={colors.error}
+            >
               Eliminar
             </Button>
           </Dialog.Actions>
@@ -383,13 +500,31 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    padding: spacing.xl,
+  },
+  errorTitle: {
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    color: colors.text,
+    textAlign: 'center',
+  },
+  errorText: {
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.primary,
-    padding: spacing.md,
-    paddingTop: spacing.xl,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
   },
   headerCenter: {
     flex: 1,
@@ -401,7 +536,7 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     color: colors.white,
-    opacity: 0.8,
+    opacity: 0.9,
   },
   headerActions: {
     flexDirection: 'row',
@@ -410,20 +545,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   offlineBanner: {
-    backgroundColor: '#FFA726',
-    margin: spacing.md,
+    marginBottom: spacing.md,
   },
   infoSection: {
     flexDirection: 'row',
-    gap: spacing.sm,
     padding: spacing.md,
+    gap: spacing.sm,
   },
   infoCard: {
     flex: 1,
+    elevation: 2,
   },
   infoLabel: {
     color: colors.textSecondary,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.xs / 2,
+  },
+  viewReportsButton: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.md,
   },
   section: {
     padding: spacing.md,
@@ -434,53 +573,37 @@ const styles = StyleSheet.create({
   },
   reportCard: {
     marginBottom: spacing.sm,
+    elevation: 2,
   },
   reportCardDisabled: {
-    opacity: 0.5,
+    opacity: 0.6,
   },
   reportCardContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   reportCardLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
+  reportInfo: {
+    flex: 1,
+    marginLeft: spacing.sm,
+  },
   reportName: {
-    fontWeight: '500',
+    color: colors.text,
+    marginBottom: spacing.xs / 2,
   },
   reportNameDisabled: {
-    color: colors.textLight,
-  },
-  availableChip: {
-    marginTop: spacing.xs,
-    backgroundColor: colors.success + '20',
-  },
-  availableChipText: {
-    color: colors.success,
-    fontSize: 11,
-  },
-  reportActions: {
-    flexDirection: 'row',
-  },
-  statsCard: {
-    backgroundColor: colors.primary + '10',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statNumber: {
-    color: colors.primary,
-    fontWeight: 'bold',
-  },
-  statLabel: {
     color: colors.textSecondary,
-    marginTop: spacing.xs,
+  },
+  statusChip: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.lightGray,
+  },
+  statusChipAvailable: {
+    backgroundColor: colors.success + '20',
   },
 });
