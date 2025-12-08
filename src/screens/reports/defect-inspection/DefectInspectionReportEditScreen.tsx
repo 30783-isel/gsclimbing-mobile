@@ -460,7 +460,7 @@ export default function DefectInspectionReportEditScreen() {
         }
       }
 
-      // 2. Preparar dados do relatório
+      // 2. Preparar dados do relatório no formato correto
       const reportData: any = {
         site,
         wtgNumber,
@@ -469,11 +469,24 @@ export default function DefectInspectionReportEditScreen() {
         photoFileIds,
       };
 
-      // Adicionar campos adicionais
+      // ✅ Adicionar campos adicionais no formato correto
+      // O backend espera: additionalField1: { label: "...", value: "..." }
+      console.log('📝 DEBUG: Adding additional fields to payload...');
       additionalFields.forEach((field, index) => {
-        reportData[`additionalField${index + 1}Label`] = field.label;
-        reportData[`additionalField${index + 1}Text`] = field.value;
+        if (field.label && field.value) {
+          const fieldNumber = index + 1;
+          reportData[`additionalField${fieldNumber}`] = {
+            label: field.label,
+            value: field.value,
+          };
+          console.log(`   ✅ additionalField${fieldNumber}:`, {
+            label: field.label,
+            value: field.value
+          });
+        }
       });
+
+      console.log('📤 DEBUG: Final payload:', JSON.stringify(reportData, null, 2));
 
       // 3. Atualizar relatório
       await defectInspectionReportAPI.update(reportId, reportData);
@@ -488,8 +501,9 @@ export default function DefectInspectionReportEditScreen() {
           },
         ]
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Erro ao guardar relatório:', error);
+      console.error('❌ Error response:', error.response?.data);
       Alert.alert('Erro', 'Não foi possível guardar o relatório');
     } finally {
       setSaving(false);
