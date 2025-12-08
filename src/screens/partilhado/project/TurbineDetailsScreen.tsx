@@ -304,11 +304,7 @@ export default function TurbineDetailsScreen() {
   };
 
   const handleCreateReport = (reportType: ReportType) => {
-    if (!isOnline) {
-      Alert.alert('Modo Offline', 'Não é possível criar relatórios offline.');
-      return;
-    }
-
+    // PERMITIR criar relatórios offline para Defect Inspection
     if (reportType === ReportType.DEFECT_INSPECTION) {
       router.push({
         pathname: `${basePath}/reports/defect-inspection` as any,
@@ -320,6 +316,11 @@ export default function TurbineDetailsScreen() {
         },
       });
     } else {
+      // Outros tipos de relatório requerem conexão
+      if (!isOnline) {
+        Alert.alert('Modo Offline', 'Este tipo de relatório requer conexão à internet.');
+        return;
+      }
       router.push({
         pathname: `${basePath}/project/${id}/turbine/${turbineId}/report/create` as any,
         params: { type: reportType.toString() },
@@ -449,8 +450,9 @@ export default function TurbineDetailsScreen() {
           {reportAvailability.map((report) => (
             <Card key={report.type} 
               style={[styles.reportCard, !report.available && styles.reportCardDisabled]}>
-              <TouchableOpacity onPress={() => handleCreateReport(report.type)}
-                disabled={!report.available || !isOnline}>
+              <TouchableOpacity 
+                onPress={() => handleCreateReport(report.type)}
+                disabled={!report.available || (!isOnline && report.type !== ReportType.DEFECT_INSPECTION)}>
                 <Card.Content>
                   <View style={styles.reportCardContent}>
                     <View style={styles.reportCardLeft}>
@@ -463,11 +465,14 @@ export default function TurbineDetailsScreen() {
                         </Text>
                         <Chip compact 
                           style={[styles.statusChip, report.available && styles.statusChipAvailable]}>
-                          {report.available ? 'Disponível' : 'Não Disponível'}
+                          {report.available ? (
+                            !isOnline && report.type === ReportType.DEFECT_INSPECTION ? 
+                            'Disponível (Offline)' : 'Disponível'
+                          ) : 'Não Disponível'}
                         </Chip>
                       </View>
                     </View>
-                    {report.available && isOnline && (
+                    {report.available && (
                       <IconButton icon="chevron-right" size={24} iconColor={colors.textSecondary} />
                     )}
                   </View>
