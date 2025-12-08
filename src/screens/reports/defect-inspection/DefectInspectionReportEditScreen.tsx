@@ -86,18 +86,45 @@ export default function DefectInspectionReportEditScreen() {
       setWtgType(report.wtgType || '');
       setYearConstruction(report.yearConstruction || '');
       
-      // Carregar fotos existentes
-      // Aqui você precisaria buscar as fotos do relatório
-      // Por agora, inicializar com array vazio para as 8 posições
-      const initialPhotos: PhotoData[] = Array.from({ length: 8 }, (_, i) => ({
-        id: `photo-${i}`,
-        uri: '',
-        description: '',
-        pageNumber: i < 4 ? 2 : 3,
-        position: (i % 4) + 1,
-        timestamp: Date.now(),
-        isUploaded: false,
-      }));
+      // ✅ CARREGAR FOTOS EXISTENTES DO SERVIDOR
+      console.log('📸 Loading existing photos for report:', reportId);
+      const existingPhotos = await defectInspectionReportAPI.getPhotos(reportId);
+      console.log('✅ Loaded', existingPhotos.length, 'photos from server');
+      
+      // Criar array com 8 posições (2 páginas x 4 fotos)
+      const initialPhotos: PhotoData[] = Array.from({ length: 8 }, (_, i) => {
+        const pageNumber = i < 4 ? 2 : 3;
+        const position = (i % 4) + 1;
+        
+        // Procurar se existe foto do servidor para esta posição
+        // (se o servidor retornar posições, usar isso; caso contrário, usar índice)
+        const existingPhoto = existingPhotos[i];
+        
+        if (existingPhoto) {
+          return {
+            id: `photo-${i}`,
+            uri: existingPhoto.downloadUrl, // URL completo para exibir
+            description: existingPhoto.description || '',
+            pageNumber,
+            position,
+            timestamp: Date.now(),
+            isUploaded: true, // Foto já existe no servidor
+            fileId: existingPhoto.fileId.toString(),
+          };
+        }
+        
+        // Slot vazio
+        return {
+          id: `photo-${i}`,
+          uri: '',
+          description: '',
+          pageNumber,
+          position,
+          timestamp: Date.now(),
+          isUploaded: false,
+        };
+      });
+      
       setPhotos(initialPhotos);
       
       // Carregar campos adicionais
@@ -112,7 +139,7 @@ export default function DefectInspectionReportEditScreen() {
       setAdditionalFields(fields);
       
     } catch (error) {
-      console.error('Erro ao carregar relatório:', error);
+      console.error('❌ Erro ao carregar relatório:', error);
       Alert.alert('Erro', 'Não foi possível carregar o relatório');
     } finally {
       setLoading(false);
@@ -147,7 +174,7 @@ export default function DefectInspectionReportEditScreen() {
         ...newPhotos[index],
         uri: result.assets[0].uri,
         timestamp: Date.now(),
-        isUploaded: false,
+        isUploaded: false, // Foto nova precisa de upload
       };
       setPhotos(newPhotos);
       setPhotoDialogVisible(false);
@@ -174,7 +201,7 @@ export default function DefectInspectionReportEditScreen() {
         ...newPhotos[index],
         uri: result.assets[0].uri,
         timestamp: Date.now(),
-        isUploaded: false,
+        isUploaded: false, // Foto nova precisa de upload
       };
       setPhotos(newPhotos);
       setPhotoDialogVisible(false);
@@ -457,25 +484,6 @@ export default function DefectInspectionReportEditScreen() {
       </View>
 
       <ScrollView style={styles.scrollView}>
-        {/* Progresso de Upload */}
-        {saving && uploadProgress > 0 && (
-          <Card style={styles.progressCard}>
-            <Card.Content>
-              <Text variant="bodyMedium" style={styles.progressText}>
-                A fazer upload das fotos...
-              </Text>
-              <ProgressBar
-                progress={uploadProgress}
-                color={colors.primary}
-                style={styles.progressBar}
-              />
-              <Text variant="bodySmall" style={styles.progressPercentage}>
-                {Math.round(uploadProgress * 100)}%
-              </Text>
-            </Card.Content>
-          </Card>
-        )}
-
         {/* Informações Gerais */}
         <Card style={styles.card}>
           <Card.Title title="Informações Gerais" />
@@ -506,77 +514,21 @@ export default function DefectInspectionReportEditScreen() {
               value={yearConstruction}
               onChangeText={setYearConstruction}
               mode="outlined"
-              keyboardType="numeric"
               style={styles.input}
             />
           </Card.Content>
         </Card>
 
-        {/* Fotos - Página 2 */}
+        {/* Fotografias - Página 2 */}
         <Card style={styles.card}>
-          <Card.Title
-            title="Fotos - Página 2"
-            subtitle="4 fotos"
-          />
+          <Card.Title title="Fotografias - Página 2" />
           <Card.Content>
             <View style={styles.photosGrid}>
               {photos.slice(0, 4).map((photo, index) => (
-                <TouchableOpacity
-                  key={photo.id}
-                  style={styles.photoContainer}
-                  onPress={() => openPhotoDialog(index)}
-                >
-                  {photo.uri ? (
-                    <>
-                      <Image source={{ uri: photo.uri }} style={styles.photo} />
-                      <View style={styles.photoOverlay}>
-                        <IconButton
-                          icon="pencil"
-                          iconColor={colors.white}
-                          size={20}
-                          onPress={() => openPhotoDialog(index)}
-                        />
-                        <IconButton
-                          icon="delete"
-                          iconColor={colors.white}
-                          size={20}
-                          onPress={() => handleRemovePhoto(index)}
-                        />
-                      </View>
-                    </>
-                  ) : (
-                    <View style={styles.photoPlaceholder}>
-                      <IconButton
-                        icon="camera-plus"
-                        iconColor={colors.textSecondary}
-                        size={32}
-                      />
-                      <Text variant="bodySmall" style={styles.photoPlaceholderText}>
-                        Foto {index + 1}
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          </Card.Content>
-        </Card>
-
-        {/* Fotos - Página 3 */}
-        <Card style={styles.card}>
-          <Card.Title
-            title="Fotos - Página 3"
-            subtitle="4 fotos"
-          />
-          <Card.Content>
-            <View style={styles.photosGrid}>
-              {photos.slice(4, 8).map((photo, index) => {
-                const actualIndex = index + 4;
-                return (
+                <View key={photo.id} style={styles.photoContainer}>
                   <TouchableOpacity
-                    key={photo.id}
-                    style={styles.photoContainer}
-                    onPress={() => openPhotoDialog(actualIndex)}
+                    style={styles.photoBox}
+                    onPress={() => openPhotoDialog(index)}
                   >
                     {photo.uri ? (
                       <>
@@ -584,33 +536,73 @@ export default function DefectInspectionReportEditScreen() {
                         <View style={styles.photoOverlay}>
                           <IconButton
                             icon="pencil"
+                            size={16}
                             iconColor={colors.white}
-                            size={20}
-                            onPress={() => openPhotoDialog(actualIndex)}
+                            onPress={() => openPhotoDialog(index)}
                           />
                           <IconButton
                             icon="delete"
+                            size={16}
                             iconColor={colors.white}
-                            size={20}
-                            onPress={() => handleRemovePhoto(actualIndex)}
+                            onPress={() => handleRemovePhoto(index)}
                           />
                         </View>
                       </>
                     ) : (
                       <View style={styles.photoPlaceholder}>
-                        <IconButton
-                          icon="camera-plus"
-                          iconColor={colors.textSecondary}
-                          size={32}
-                        />
-                        <Text variant="bodySmall" style={styles.photoPlaceholderText}>
-                          Foto {actualIndex + 1}
+                        <IconButton icon="camera-plus" size={32} />
+                        <Text style={styles.photoPlaceholderText}>
+                          Foto {index + 1}
                         </Text>
                       </View>
                     )}
                   </TouchableOpacity>
-                );
-              })}
+                </View>
+              ))}
+            </View>
+          </Card.Content>
+        </Card>
+
+        {/* Fotografias - Página 3 */}
+        <Card style={styles.card}>
+          <Card.Title title="Fotografias - Página 3" />
+          <Card.Content>
+            <View style={styles.photosGrid}>
+              {photos.slice(4, 8).map((photo, index) => (
+                <View key={photo.id} style={styles.photoContainer}>
+                  <TouchableOpacity
+                    style={styles.photoBox}
+                    onPress={() => openPhotoDialog(index + 4)}
+                  >
+                    {photo.uri ? (
+                      <>
+                        <Image source={{ uri: photo.uri }} style={styles.photo} />
+                        <View style={styles.photoOverlay}>
+                          <IconButton
+                            icon="pencil"
+                            size={16}
+                            iconColor={colors.white}
+                            onPress={() => openPhotoDialog(index + 4)}
+                          />
+                          <IconButton
+                            icon="delete"
+                            size={16}
+                            iconColor={colors.white}
+                            onPress={() => handleRemovePhoto(index + 4)}
+                          />
+                        </View>
+                      </>
+                    ) : (
+                      <View style={styles.photoPlaceholder}>
+                        <IconButton icon="camera-plus" size={32} />
+                        <Text style={styles.photoPlaceholderText}>
+                          Foto {index + 5}
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              ))}
             </View>
           </Card.Content>
         </Card>
@@ -619,31 +611,25 @@ export default function DefectInspectionReportEditScreen() {
         <Card style={styles.card}>
           <Card.Title
             title="Campos Adicionais"
-            subtitle={`${additionalFields.length}/7 campos`}
             right={(props) => (
               <IconButton
                 {...props}
                 icon="plus"
                 onPress={() => openFieldDialog()}
-                disabled={additionalFields.length >= 7}
               />
             )}
           />
           <Card.Content>
             {additionalFields.length === 0 ? (
-              <Text variant="bodyMedium" style={styles.emptyText}>
-                Nenhum campo adicional. Toque no + para adicionar.
+              <Text style={styles.emptyText}>
+                Nenhum campo adicional. Clique em + para adicionar.
               </Text>
             ) : (
               additionalFields.map((field, index) => (
                 <View key={index} style={styles.fieldItem}>
                   <View style={styles.fieldContent}>
-                    <Text variant="labelMedium" style={styles.fieldLabel}>
-                      {field.label}
-                    </Text>
-                    <Text variant="bodyMedium" style={styles.fieldValueText}>
-                      {field.value}
-                    </Text>
+                    <Text style={styles.fieldLabel}>{field.label}</Text>
+                    <Text style={styles.fieldValueText}>{field.value}</Text>
                   </View>
                   <View style={styles.fieldActions}>
                     <IconButton
@@ -663,16 +649,25 @@ export default function DefectInspectionReportEditScreen() {
           </Card.Content>
         </Card>
 
-        {/* Botão de Guardar */}
+        {/* Progresso de Upload */}
+        {saving && uploadProgress > 0 && (
+          <Card style={styles.card}>
+            <Card.Content>
+              <Text>A enviar fotografias...</Text>
+              <ProgressBar progress={uploadProgress} style={styles.progressBar} />
+            </Card.Content>
+          </Card>
+        )}
+
+        {/* Botão Guardar */}
         <Button
           mode="contained"
           onPress={handleSave}
           loading={saving}
           disabled={saving}
           style={styles.saveButton}
-          icon="content-save"
         >
-          {saving ? 'A Guardar...' : 'Guardar Alterações'}
+          {saving ? 'A guardar...' : 'Guardar Alterações'}
         </Button>
       </ScrollView>
 
@@ -682,7 +677,7 @@ export default function DefectInspectionReportEditScreen() {
           visible={photoDialogVisible}
           onDismiss={() => setPhotoDialogVisible(false)}
         >
-          <Dialog.Title>Selecionar Foto</Dialog.Title>
+          <Dialog.Title>Escolher Foto</Dialog.Title>
           <Dialog.Content>
             <Button
               mode="outlined"
@@ -717,10 +712,7 @@ export default function DefectInspectionReportEditScreen() {
 
       {/* Diálogo de Campo Adicional */}
       <Portal>
-        <Dialog
-          visible={fieldDialogVisible}
-          onDismiss={closeFieldDialog}
-        >
+        <Dialog visible={fieldDialogVisible} onDismiss={closeFieldDialog}>
           <Dialog.Title>
             {editingFieldIndex !== null ? 'Editar Campo' : 'Adicionar Campo'}
           </Dialog.Title>
@@ -762,10 +754,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.primary,
     paddingVertical: spacing.sm,
+    elevation: 4,
   },
   headerCenter: {
     flex: 1,
-    alignItems: 'center',
+    paddingHorizontal: spacing.md,
   },
   headerTitle: {
     color: colors.white,
@@ -773,7 +766,10 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     color: colors.white,
-    opacity: 0.9,
+    opacity: 0.8,
+  },
+  scrollView: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -784,29 +780,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     color: colors.textSecondary,
   },
-  scrollView: {
-    flex: 1,
-  },
-  progressCard: {
-    margin: spacing.md,
-    backgroundColor: colors.white,
-  },
-  progressText: {
-    marginBottom: spacing.sm,
-  },
-  progressBar: {
-    height: 8,
-    borderRadius: 4,
-  },
-  progressPercentage: {
-    marginTop: spacing.xs,
-    textAlign: 'right',
-    color: colors.textSecondary,
-  },
   card: {
     margin: spacing.md,
-    marginBottom: 0,
-    backgroundColor: colors.white,
   },
   input: {
     marginBottom: spacing.md,
@@ -818,11 +793,15 @@ const styles = StyleSheet.create({
   },
   photoContainer: {
     width: '48%',
-    aspectRatio: 4 / 3,
+    aspectRatio: 1,
     marginBottom: spacing.md,
+  },
+  photoBox: {
+    flex: 1,
     borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   photo: {
     width: '100%',
@@ -879,5 +858,8 @@ const styles = StyleSheet.create({
   },
   dialogInput: {
     marginBottom: spacing.md,
+  },
+  progressBar: {
+    marginTop: spacing.sm,
   },
 });

@@ -6,6 +6,20 @@ import type {
 } from '@/reports/defectInspectionReport/defectInspectionReport.types';
 
 /**
+ * Interface para dados de uma foto do servidor
+ */
+export interface ReportPhotoData {
+  fileId: number;
+  hash: string;
+  name: string;
+  description: string | null;
+  mimeType: string;
+  size: number;
+  createDate: string;
+  downloadUrl: string;
+}
+
+/**
  * API para Defect Inspection Report
  */
 export const defectInspectionReportAPI = {
@@ -68,10 +82,34 @@ export const defectInspectionReportAPI = {
   },
 
   /**
+   * ✅ NOVO: Obter fotos de um relatório
+   * @param reportId - ID do relatório
+   * @returns Lista de fotos com URLs para download
+   */
+  getPhotos: async (reportId: number): Promise<ReportPhotoData[]> => {
+    try {
+      console.log(`📸 Fetching photos for report ${reportId}...`);
+      
+      const response = await httpClient.get(
+        `${API_CONFIG.baseUrl}reports/mobile/defect-inspection/${reportId}/photos`
+      );
+      
+      const photos = response.data;
+      console.log(`✅ Found ${photos.length} photos for report ${reportId}`);
+      
+      return photos;
+    } catch (error) {
+      console.error(`❌ Error fetching photos for report ${reportId}:`, error);
+      // Retornar array vazio em caso de erro
+      return [];
+    }
+  },
+
+  /**
    * Upload de foto (usa endpoint existente)
    */
   uploadPhoto: async (
-    reportId: string,
+    reportUuid: string,
     photoUri: string,
     description: string
   ): Promise<{ fileId: string; success: boolean }> => {
@@ -89,7 +127,7 @@ export const defectInspectionReportAPI = {
     formData.append('description', description);
 
     const response = await httpClient.post(
-      `${API_CONFIG.baseFilesUrl}upload/${reportId}`,
+      `${API_CONFIG.baseFilesUrl}upload/${reportUuid}`,
       formData,
       {
         headers: {
