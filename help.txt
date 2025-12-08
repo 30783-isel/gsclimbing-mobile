@@ -19,3 +19,7 @@ npm install
 # Inicia limpo
 npx expo start --clear
 ----------------------------------------------------
+
+
+
+npm run find-unused
