@@ -328,15 +328,15 @@ export default function ProjectsScreen({ userRole }: ProjectsScreenProps) {
             onDismiss={() => setSheetVisible(false)}
             onSubmit={handleFormSubmit}
             mode={sheetMode}
-            initialData={selectedForEdit}
+            //initialData={selectedForEdit}
           />
 
           <FiltersSheet
             visible={filtersSheetVisible}
             onDismiss={() => setFiltersSheetVisible(false)}
             onApply={handleApplyFilters}
-            onClear={handleClearFilters}
-            activeFilters={activeFilters}
+            //onClear={handleClearFilters}
+            //activeFilters={activeFilters}
           />
         </>
       )}
