@@ -172,17 +172,28 @@ export default function TurbineDetailsScreen() {
         console.log('🔍 DEBUG: Tentando buscar turbinas do projeto:', id);
         
         try {
-          // Carregar turbinas do cache
-          const cachedTurbines = await dataCacheService.getTurbines(Number(id));
+          // 🔑 KEY CORRETA: @cache:turbines_PROJECTID
+          const cacheKey = `${CACHE_KEYS.TURBINES}_${id}`;
+          console.log('🔑 DEBUG: Cache key:', cacheKey);
+          
+          // Tentar ler diretamente do AsyncStorage com a key correta
+          const cached = await AsyncStorage.getItem(cacheKey);
+          console.log('📦 DEBUG: Cache raw:', cached ? 'existe' : 'vazio');
+          
+          const cachedTurbines = cached ? JSON.parse(cached) : [];
           console.log(`📦 Cache: ${cachedTurbines.length} turbinas encontradas`);
           
           if (cachedTurbines.length > 0) {
-            console.log('🔍 DEBUG: IDs das turbinas no cache:', cachedTurbines.map(t => ({ id: t.id, idTurbine: t.idTurbine, name: t.name })));
+            console.log('🔍 DEBUG: IDs das turbinas no cache:', cachedTurbines.map((t: any) => ({ 
+              id: t.id, 
+              idTurbine: t.idTurbine, 
+              name: t.name 
+            })));
             console.log('🔍 DEBUG: Procurando turbineId:', turbineId, 'Tipo:', typeof turbineId);
           }
           
           // Procurar turbina específica no cache
-          turbineData = cachedTurbines.find(t => {
+          turbineData = cachedTurbines.find((t: any) => {
             const match = t.id === turbineId || 
                          t.id === String(turbineId) ||
                          t.idTurbine === Number(turbineId) ||
@@ -210,7 +221,7 @@ export default function TurbineDetailsScreen() {
           const cachedProjects = cached ? JSON.parse(cached) : [];
           console.log('🔍 DEBUG: Número de projetos no cache:', cachedProjects.length);
           
-          projectData = cachedProjects.find(p => 
+          projectData = cachedProjects.find((p: any) => 
             p.idProject === Number(id) || p.idProject.toString() === id
           ) || null;
           
