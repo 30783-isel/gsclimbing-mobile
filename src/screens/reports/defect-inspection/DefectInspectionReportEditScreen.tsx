@@ -75,7 +75,15 @@ export default function DefectInspectionReportEditScreen() {
   const loadReport = async () => {
     try {
       setLoading(true);
+      console.log('🔍 DEBUG: Starting loadReport for reportId:', reportId);
+      
       const report = await defectInspectionReportAPI.getById(reportId);
+      console.log('✅ DEBUG: Report loaded:', {
+        reportId: report.reportId,
+        uuid: report.uuid,
+        site: report.site,
+        numberPictures: report.numberPictures
+      });
       
       // Guardar UUID para upload de fotos
       setReportUuid(report.uuid);
@@ -87,9 +95,14 @@ export default function DefectInspectionReportEditScreen() {
       setYearConstruction(report.yearConstruction || '');
       
       // ✅ CARREGAR FOTOS EXISTENTES DO SERVIDOR
-      console.log('📸 Loading existing photos for report:', reportId);
+      console.log('📸 DEBUG: Loading photos from server...');
+      console.log('📸 DEBUG: API_CONFIG.baseUrl:', API_CONFIG.baseUrl);
+      
       const existingPhotos = await defectInspectionReportAPI.getPhotos(reportId);
-      console.log('✅ Loaded', existingPhotos.length, 'photos from server');
+      console.log('✅ DEBUG: Photos response:', {
+        count: existingPhotos.length,
+        photos: existingPhotos
+      });
       
       // Criar array com 8 posições (2 páginas x 4 fotos)
       const initialPhotos: PhotoData[] = Array.from({ length: 8 }, (_, i) => {
@@ -97,23 +110,47 @@ export default function DefectInspectionReportEditScreen() {
         const position = (i % 4) + 1;
         
         // Procurar se existe foto do servidor para esta posição
-        // (se o servidor retornar posições, usar isso; caso contrário, usar índice)
         const existingPhoto = existingPhotos[i];
         
         if (existingPhoto) {
+          console.log(`📷 DEBUG Photo ${i + 1}:`, {
+            fileId: existingPhoto.fileId,
+            hash: existingPhoto.hash,
+            downloadUrl: existingPhoto.downloadUrl,
+            name: existingPhoto.name
+          });
+          
+          // ✅ CONSTRUIR URL COMPLETO para a imagem
+          // O servidor retorna: "/api/reports/files/download/{hash}"
+          // Mas o endpoint correto é: "/api/reports/mobile/files/download/{hash}"
+          const baseUrlClean = API_CONFIG.baseUrl.replace('/api/', '');
+          
+          // Corrigir o path para usar o endpoint mobile correto
+          const correctPath = existingPhoto.downloadUrl.replace(
+            '/api/reports/files/download/',
+            '/api/reports/mobile/files/download/'
+          );
+          
+          const fullImageUrl = correctPath.startsWith('http') 
+            ? correctPath 
+            : `${baseUrlClean}${correctPath}`;
+          
+          console.log(`🔗 DEBUG Photo ${i + 1} Full URL:`, fullImageUrl);
+          
           return {
             id: `photo-${i}`,
-            uri: existingPhoto.downloadUrl, // URL completo para exibir
+            uri: fullImageUrl,
             description: existingPhoto.description || '',
             pageNumber,
             position,
             timestamp: Date.now(),
-            isUploaded: true, // Foto já existe no servidor
+            isUploaded: true,
             fileId: existingPhoto.fileId.toString(),
           };
         }
         
         // Slot vazio
+        console.log(`⬜ DEBUG Photo ${i + 1}: Empty slot`);
         return {
           id: `photo-${i}`,
           uri: '',
@@ -124,6 +161,13 @@ export default function DefectInspectionReportEditScreen() {
           isUploaded: false,
         };
       });
+      
+      console.log('✅ DEBUG: initialPhotos array created:', initialPhotos.map(p => ({
+        id: p.id,
+        hasUri: !!p.uri,
+        uri: p.uri.substring(0, 50) + '...',
+        isUploaded: p.isUploaded
+      })));
       
       setPhotos(initialPhotos);
       
@@ -138,8 +182,14 @@ export default function DefectInspectionReportEditScreen() {
       }
       setAdditionalFields(fields);
       
+      console.log('✅ DEBUG: loadReport completed successfully');
+      
     } catch (error) {
-      console.error('❌ Erro ao carregar relatório:', error);
+      console.error('❌ DEBUG: Error in loadReport:', error);
+      console.error('❌ DEBUG: Error details:', {
+        message: error.message,
+        stack: error.stack
+      });
       Alert.alert('Erro', 'Não foi possível carregar o relatório');
     } finally {
       setLoading(false);
@@ -524,41 +574,55 @@ export default function DefectInspectionReportEditScreen() {
           <Card.Title title="Fotografias - Página 2" />
           <Card.Content>
             <View style={styles.photosGrid}>
-              {photos.slice(0, 4).map((photo, index) => (
-                <View key={photo.id} style={styles.photoContainer}>
-                  <TouchableOpacity
-                    style={styles.photoBox}
-                    onPress={() => openPhotoDialog(index)}
-                  >
-                    {photo.uri ? (
-                      <>
-                        <Image source={{ uri: photo.uri }} style={styles.photo} />
-                        <View style={styles.photoOverlay}>
-                          <IconButton
-                            icon="pencil"
-                            size={16}
-                            iconColor={colors.white}
-                            onPress={() => openPhotoDialog(index)}
+              {photos.slice(0, 4).map((photo, index) => {
+                console.log(`🖼️ DEBUG Rendering Photo Page 2 - ${index + 1}:`, {
+                  id: photo.id,
+                  hasUri: !!photo.uri,
+                  uri: photo.uri ? photo.uri.substring(0, 80) : 'empty',
+                  isUploaded: photo.isUploaded
+                });
+                
+                return (
+                  <View key={photo.id} style={styles.photoContainer}>
+                    <TouchableOpacity
+                      style={styles.photoBox}
+                      onPress={() => openPhotoDialog(index)}
+                    >
+                      {photo.uri ? (
+                        <>
+                          <Image 
+                            source={{ uri: photo.uri }} 
+                            style={styles.photo}
+                            onLoad={() => console.log(`✅ DEBUG Photo ${index + 1} loaded successfully`)}
+                            onError={(e) => console.error(`❌ DEBUG Photo ${index + 1} failed to load:`, e.nativeEvent)}
                           />
-                          <IconButton
-                            icon="delete"
-                            size={16}
-                            iconColor={colors.white}
-                            onPress={() => handleRemovePhoto(index)}
-                          />
+                          <View style={styles.photoOverlay}>
+                            <IconButton
+                              icon="pencil"
+                              size={16}
+                              iconColor={colors.white}
+                              onPress={() => openPhotoDialog(index)}
+                            />
+                            <IconButton
+                              icon="delete"
+                              size={16}
+                              iconColor={colors.white}
+                              onPress={() => handleRemovePhoto(index)}
+                            />
+                          </View>
+                        </>
+                      ) : (
+                        <View style={styles.photoPlaceholder}>
+                          <IconButton icon="camera-plus" size={32} />
+                          <Text style={styles.photoPlaceholderText}>
+                            Foto {index + 1}
+                          </Text>
                         </View>
-                      </>
-                    ) : (
-                      <View style={styles.photoPlaceholder}>
-                        <IconButton icon="camera-plus" size={32} />
-                        <Text style={styles.photoPlaceholderText}>
-                          Foto {index + 1}
-                        </Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              ))}
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
             </View>
           </Card.Content>
         </Card>
@@ -568,41 +632,55 @@ export default function DefectInspectionReportEditScreen() {
           <Card.Title title="Fotografias - Página 3" />
           <Card.Content>
             <View style={styles.photosGrid}>
-              {photos.slice(4, 8).map((photo, index) => (
-                <View key={photo.id} style={styles.photoContainer}>
-                  <TouchableOpacity
-                    style={styles.photoBox}
-                    onPress={() => openPhotoDialog(index + 4)}
-                  >
-                    {photo.uri ? (
-                      <>
-                        <Image source={{ uri: photo.uri }} style={styles.photo} />
-                        <View style={styles.photoOverlay}>
-                          <IconButton
-                            icon="pencil"
-                            size={16}
-                            iconColor={colors.white}
-                            onPress={() => openPhotoDialog(index + 4)}
+              {photos.slice(4, 8).map((photo, index) => {
+                console.log(`🖼️ DEBUG Rendering Photo Page 3 - ${index + 5}:`, {
+                  id: photo.id,
+                  hasUri: !!photo.uri,
+                  uri: photo.uri ? photo.uri.substring(0, 80) : 'empty',
+                  isUploaded: photo.isUploaded
+                });
+                
+                return (
+                  <View key={photo.id} style={styles.photoContainer}>
+                    <TouchableOpacity
+                      style={styles.photoBox}
+                      onPress={() => openPhotoDialog(index + 4)}
+                    >
+                      {photo.uri ? (
+                        <>
+                          <Image 
+                            source={{ uri: photo.uri }} 
+                            style={styles.photo}
+                            onLoad={() => console.log(`✅ DEBUG Photo ${index + 5} loaded successfully`)}
+                            onError={(e) => console.error(`❌ DEBUG Photo ${index + 5} failed to load:`, e.nativeEvent)}
                           />
-                          <IconButton
-                            icon="delete"
-                            size={16}
-                            iconColor={colors.white}
-                            onPress={() => handleRemovePhoto(index + 4)}
-                          />
+                          <View style={styles.photoOverlay}>
+                            <IconButton
+                              icon="pencil"
+                              size={16}
+                              iconColor={colors.white}
+                              onPress={() => openPhotoDialog(index + 4)}
+                            />
+                            <IconButton
+                              icon="delete"
+                              size={16}
+                              iconColor={colors.white}
+                              onPress={() => handleRemovePhoto(index + 4)}
+                            />
+                          </View>
+                        </>
+                      ) : (
+                        <View style={styles.photoPlaceholder}>
+                          <IconButton icon="camera-plus" size={32} />
+                          <Text style={styles.photoPlaceholderText}>
+                            Foto {index + 5}
+                          </Text>
                         </View>
-                      </>
-                    ) : (
-                      <View style={styles.photoPlaceholder}>
-                        <IconButton icon="camera-plus" size={32} />
-                        <Text style={styles.photoPlaceholderText}>
-                          Foto {index + 5}
-                        </Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              ))}
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
             </View>
           </Card.Content>
         </Card>

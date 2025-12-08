@@ -88,18 +88,35 @@ export const defectInspectionReportAPI = {
    */
   getPhotos: async (reportId: number): Promise<ReportPhotoData[]> => {
     try {
-      console.log(`📸 Fetching photos for report ${reportId}...`);
+      console.log('🔍 DEBUG API: getPhotos called with reportId:', reportId);
+      const endpoint = `${API_CONFIG.baseUrl}reports/mobile/defect-inspection/${reportId}/photos`;
+      console.log('🔍 DEBUG API: Full endpoint:', endpoint);
       
-      const response = await httpClient.get(
-        `${API_CONFIG.baseUrl}reports/mobile/defect-inspection/${reportId}/photos`
-      );
+      const response = await httpClient.get(endpoint);
+      
+      console.log('✅ DEBUG API: Response status:', response.status);
+      console.log('✅ DEBUG API: Response data type:', typeof response.data);
+      console.log('✅ DEBUG API: Response data:', JSON.stringify(response.data, null, 2));
       
       const photos = response.data;
-      console.log(`✅ Found ${photos.length} photos for report ${reportId}`);
+      console.log(`✅ DEBUG API: Found ${photos.length} photos for report ${reportId}`);
+      
+      if (photos.length > 0) {
+        console.log('📸 DEBUG API: First photo details:', {
+          fileId: photos[0].fileId,
+          hash: photos[0].hash,
+          downloadUrl: photos[0].downloadUrl,
+          name: photos[0].name,
+          mimeType: photos[0].mimeType
+        });
+      }
       
       return photos;
-    } catch (error) {
-      console.error(`❌ Error fetching photos for report ${reportId}:`, error);
+    } catch (error: any) {
+      console.error(`❌ DEBUG API: Error fetching photos for report ${reportId}`);
+      console.error('❌ DEBUG API: Error message:', error.message);
+      console.error('❌ DEBUG API: Error response:', error.response?.data);
+      console.error('❌ DEBUG API: Error status:', error.response?.status);
       // Retornar array vazio em caso de erro
       return [];
     }
