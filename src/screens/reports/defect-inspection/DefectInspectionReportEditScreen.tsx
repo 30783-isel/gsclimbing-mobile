@@ -35,7 +35,7 @@ import type {
   PhotoData,
   AdditionalField,
 } from '@/types/defectInspectionReport.types';
-import { defectInspectionReportAPI } from '@/reports/defectInspectionReport/defectInspectionReport.api';
+import { defectInspectionReportAPI } from '@/services/api/defectInspectionReport.api';
 
 export default function DefectInspectionReportEditScreen() {
   const router = useRouter();
