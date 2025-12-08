@@ -1,12 +1,14 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import { API_CONFIG, TIMEOUT } from '@/constants/api';
 
 /**
- * Cliente HTTP com interceptors para Basic Auth
+ * Cliente HTTP com interceptors para Basic Auth e suporte offline
  */
 class HttpClient {
   private instance: AxiosInstance;
+  private isOnline: boolean = true;
 
   constructor() {
     this.instance = axios.create({
@@ -17,7 +19,23 @@ class HttpClient {
       },
     });
 
+    // Monitorar conexão
+    this.setupNetworkMonitoring();
     this.setupInterceptors();
+  }
+
+  /**
+   * Monitorar estado da rede
+   */
+  private setupNetworkMonitoring(): void {
+    NetInfo.addEventListener(state => {
+      this.isOnline = state.isConnected ?? false;
+      if (!this.isOnline) {
+        console.log('📵 Modo Offline - Pedidos HTTP serão cancelados');
+      } else {
+        console.log('🌐 Online - Pedidos HTTP permitidos');
+      }
+    });
   }
 
   /**
@@ -27,6 +45,16 @@ class HttpClient {
     // Request Interceptor
     this.instance.interceptors.request.use(
       async (config) => {
+        // ❌ BLOQUEAR pedidos se estiver offline
+        if (!this.isOnline) {
+          console.log('🚫 Pedido bloqueado (offline):', config.url);
+          return Promise.reject({
+            message: 'Sem conexão à Internet',
+            code: 'OFFLINE',
+            config,
+          });
+        }
+
         try {
           const username = await AsyncStorage.getItem('username');
           const password = await AsyncStorage.getItem('password');
@@ -61,6 +89,11 @@ class HttpClient {
         return response;
       },
       async (error: AxiosError) => {
+        // Ignorar erros de pedidos bloqueados por offline
+        if (error.code === 'OFFLINE') {
+          return Promise.reject(error);
+        }
+
         if (__DEV__) {
           console.error('❌ Response error:', {
             status: error.response?.status,
@@ -102,6 +135,13 @@ class HttpClient {
   }
 
   /**
+   * Verificar se está online
+   */
+  public getIsOnline(): boolean {
+    return this.isOnline;
+  }
+
+  /**
    * Obter instância do axios
    */
   public getInstance(): AxiosInstance {
@@ -113,3 +153,4 @@ class HttpClient {
 const httpClient = new HttpClient();
 
 export default httpClient.getInstance();
+export { httpClient };

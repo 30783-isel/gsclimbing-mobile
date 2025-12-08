@@ -1,30 +1,49 @@
+// src/screens/partilhado/project/TurbineDetailsScreen.tsx
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Text, Card, IconButton, Portal, Dialog, Button, Chip } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { Text, Card, IconButton, FAB, Chip, Portal, Dialog, Button, Banner } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { projectsAPI } from '@/services/api/projects.api';
+import { useOfflineReports } from '@/hooks/useOfflineReports';
 import { colors, spacing } from '@/constants/theme';
+import { ReportType, REPORT_TYPE_NAMES } from '@/types';
 import type { Turbine } from '@/types/turbine.types';
-import { REPORT_TYPE_NAMES, ReportType } from '@/types/report.types';
+import type { Project } from '@/types/project.types';
 import { useAuthStore } from '@/store/authStore';
+import NetInfo from '@react-native-community/netinfo';
 
 export default function TurbineDetailsScreen() {
   const { id, turbineId } = useLocalSearchParams<{ id: string; turbineId: string }>();
   const router = useRouter();
   const { t } = useTranslation();
   const { role } = useAuthStore();
-
+  
   const [turbine, setTurbine] = useState<Turbine | null>(null);
-  const [project, setProject] = useState<any>(null);
+  const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
 
-  // Verifica se é ADMIN
+  // Hook offline para relatórios
+  const {
+    reports,
+    isOnline: reportsOnline,
+    loading: reportsLoading,
+    error: reportsError,
+    refresh: refreshReports,
+  } = useOfflineReports(parseInt(turbineId));
+
   const isAdmin = role === 'ADMIN';
-  
-  // Define basePath conforme o role
   const basePath = isAdmin ? '/(tabs)/admin' : '/(tabs)/tech';
+
+  // Monitorar conexão
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOnline(state.isConnected ?? false);
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -63,6 +82,16 @@ export default function TurbineDetailsScreen() {
   };
 
   const handleCreateReport = (reportType: ReportType) => {
+    // Verificar se está online para criar relatórios
+    if (!isOnline) {
+      Alert.alert(
+        'Modo Offline',
+        'Não é possível criar novos relatórios em modo offline. Por favor, conecte-se à Internet.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     if (reportType === ReportType.DEFECT_INSPECTION) {
       router.push({
         pathname: `${basePath}/reports/defect-inspection` as any,
@@ -174,10 +203,9 @@ export default function TurbineDetailsScreen() {
             {turbine.name}
           </Text>
           <Text variant="bodySmall" style={styles.headerSubtitle}>
-            {turbine.number ? `#${turbine.number}` : project?.name}
+            {turbine.number ? `WTG ${turbine.number}` : 'Turbina'}
           </Text>
         </View>
-        {/* Botões de ação só para ADMIN */}
         {isAdmin && (
           <View style={styles.headerActions}>
             <IconButton
@@ -197,108 +225,146 @@ export default function TurbineDetailsScreen() {
       </View>
 
       <ScrollView style={styles.content}>
-        {/* Turbine Info Card */}
-        <Card style={styles.infoCard}>
-          <Card.Title title="Informações da Turbina" />
-          <Card.Content>
-            {turbine.site && (
-              <View style={styles.infoRow}>
-                <Text variant="bodyMedium" style={styles.infoLabel}>Site:</Text>
-                <Text variant="bodyMedium" style={styles.infoValue}>{turbine.site}</Text>
-              </View>
-            )}
-            {turbine.type && (
-              <View style={styles.infoRow}>
-                <Text variant="bodyMedium" style={styles.infoLabel}>Tipo:</Text>
-                <Text variant="bodyMedium" style={styles.infoValue}>{turbine.type}</Text>
-              </View>
-            )}
-            {turbine.year && (
-              <View style={styles.infoRow}>
-                <Text variant="bodyMedium" style={styles.infoLabel}>Ano:</Text>
-                <Text variant="bodyMedium" style={styles.infoValue}>{turbine.year}</Text>
-              </View>
-            )}
-          </Card.Content>
-        </Card>
+        {/* Banner de Modo Offline */}
+        {!isOnline && (
+          <Banner
+            visible={true}
+            icon="wifi-off"
+            style={styles.offlineBanner}
+          >
+            📵 Modo Offline - Pode visualizar e editar relatórios já carregados
+          </Banner>
+        )}
 
-        {/* Botão Ver Relatórios */}
-        <Button
-          mode="contained"
-          icon="file-document-multiple"
-          onPress={handleViewReports}
-          style={styles.viewReportsButton}
-          buttonColor={colors.secondary}
-          textColor={colors.primary}
-        >
-          Ver Relatórios Existentes
-        </Button>
+        {/* Info Cards */}
+        <View style={styles.infoSection}>
+          <Card style={styles.infoCard}>
+            <Card.Content>
+              <Text variant="labelSmall" style={styles.infoLabel}>Modelo</Text>
+              <Text variant="bodyLarge">{turbine.model || 'N/A'}</Text>
+            </Card.Content>
+          </Card>
 
-        {/* Available Reports */}
-        <Card style={styles.reportsCard}>
-          <Card.Title title="Relatórios Disponíveis" />
-          <Card.Content>
-            {reportAvailability.filter(r => r.available).length === 0 ? (
-              <Text style={styles.noReports}>
-                Nenhum tipo de relatório ativo para esta turbina.
-              </Text>
-            ) : (
-              reportAvailability
-                .filter(r => r.available)
-                .map((report) => (
-                  <TouchableOpacity
-                    key={report.type}
-                    onPress={() => handleCreateReport(report.type)}
-                    style={styles.reportItem}
-                  >
-                    <View style={styles.reportItemContent}>
-                      <View style={[styles.reportIcon, { backgroundColor: report.color + '20' }]}>
-                        <IconButton
-                          icon={report.icon}
-                          size={24}
-                          iconColor={report.color}
-                        />
-                      </View>
-                      <View style={styles.reportText}>
-                        <Text variant="bodyLarge" style={styles.reportName}>
-                          {report.name}
-                        </Text>
+          <Card style={styles.infoCard}>
+            <Card.Content>
+              <Text variant="labelSmall" style={styles.infoLabel}>Potência</Text>
+              <Text variant="bodyLarge">{turbine.power || 'N/A'}</Text>
+            </Card.Content>
+          </Card>
+
+          <Card style={styles.infoCard}>
+            <Card.Content>
+              <Text variant="labelSmall" style={styles.infoLabel}>Ano</Text>
+              <Text variant="bodyLarge">{turbine.year || 'N/A'}</Text>
+            </Card.Content>
+          </Card>
+        </View>
+
+        {/* Relatórios Disponíveis */}
+        <View style={styles.section}>
+          <Text variant="titleMedium" style={styles.sectionTitle}>
+            Relatórios Disponíveis
+          </Text>
+
+          {reportAvailability.map((report) => (
+            <Card
+              key={report.type}
+              style={[
+                styles.reportCard,
+                !report.available && styles.reportCardDisabled,
+              ]}
+            >
+              <Card.Content>
+                <View style={styles.reportCardContent}>
+                  <View style={styles.reportCardLeft}>
+                    <IconButton
+                      icon={report.icon}
+                      size={24}
+                      iconColor={report.available ? report.color : colors.textLight}
+                    />
+                    <View>
+                      <Text
+                        variant="bodyLarge"
+                        style={[
+                          styles.reportName,
+                          !report.available && styles.reportNameDisabled,
+                        ]}
+                      >
+                        {report.name}
+                      </Text>
+                      {report.available && (
                         <Chip
                           mode="flat"
-                          style={styles.statusChip}
-                          textStyle={{ color: colors.success }}
+                          style={styles.availableChip}
+                          textStyle={styles.availableChipText}
                         >
                           Disponível
                         </Chip>
-                      </View>
-                      <IconButton icon="chevron-right" size={24} />
+                      )}
                     </View>
-                  </TouchableOpacity>
-                ))
-            )}
-          </Card.Content>
-        </Card>
+                  </View>
+
+                  {report.available && (
+                    <View style={styles.reportActions}>
+                      <IconButton
+                        icon="eye"
+                        size={20}
+                        iconColor={colors.primary}
+                        onPress={handleViewReports}
+                      />
+                      {isOnline && (
+                        <IconButton
+                          icon="plus-circle"
+                          size={20}
+                          iconColor={colors.primary}
+                          onPress={() => handleCreateReport(report.type)}
+                        />
+                      )}
+                    </View>
+                  )}
+                </View>
+              </Card.Content>
+            </Card>
+          ))}
+        </View>
+
+        {/* Estatísticas de Relatórios */}
+        {reports.length > 0 && (
+          <View style={styles.section}>
+            <Text variant="titleMedium" style={styles.sectionTitle}>
+              Estatísticas
+            </Text>
+            <Card style={styles.statsCard}>
+              <Card.Content>
+                <View style={styles.statsRow}>
+                  <View style={styles.statItem}>
+                    <Text variant="headlineSmall" style={styles.statNumber}>
+                      {reports.length}
+                    </Text>
+                    <Text variant="bodySmall" style={styles.statLabel}>
+                      {reportsOnline ? 'Relatórios' : 'Relatórios (cache)'}
+                    </Text>
+                  </View>
+                </View>
+              </Card.Content>
+            </Card>
+          </View>
+        )}
       </ScrollView>
 
+      {/* Delete Dialog */}
       <Portal>
-        <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)}>
+        <Dialog
+          visible={deleteDialogVisible}
+          onDismiss={() => setDeleteDialogVisible(false)}
+        >
           <Dialog.Title>Eliminar Turbina</Dialog.Title>
           <Dialog.Content>
-            <Text>
-              Tem a certeza que deseja eliminar a turbina "{turbine?.name}"?
-            </Text>
-            <Text style={{ marginTop: 8, color: colors.error }}>
-              Esta ação não pode ser desfeita.
-            </Text>
+            <Text>Tem a certeza que deseja eliminar esta turbina?</Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setDeleteDialogVisible(false)}>
-              Cancelar
-            </Button>
-            <Button
-              onPress={handleDelete}
-              textColor={colors.error}
-            >
+            <Button onPress={() => setDeleteDialogVisible(false)}>Cancelar</Button>
+            <Button onPress={handleDelete} textColor={colors.error}>
               Eliminar
             </Button>
           </Dialog.Actions>
@@ -322,8 +388,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.primary,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xs,
+    padding: spacing.md,
+    paddingTop: spacing.xl,
   },
   headerCenter: {
     flex: 1,
@@ -335,7 +401,7 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     color: colors.white,
-    opacity: 0.9,
+    opacity: 0.8,
   },
   headerActions: {
     flexDirection: 'row',
@@ -343,64 +409,78 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  infoCard: {
+  offlineBanner: {
+    backgroundColor: '#FFA726',
     margin: spacing.md,
-    elevation: 2,
   },
-  infoRow: {
+  infoSection: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    gap: spacing.sm,
+    padding: spacing.md,
+  },
+  infoCard: {
+    flex: 1,
   },
   infoLabel: {
-    fontWeight: 'bold',
     color: colors.textSecondary,
+    marginBottom: spacing.xs,
   },
-  infoValue: {
-    color: colors.text,
+  section: {
+    padding: spacing.md,
   },
-  viewReportsButton: {
-    marginHorizontal: spacing.md,
+  sectionTitle: {
     marginBottom: spacing.md,
+    fontWeight: 'bold',
   },
-  reportsCard: {
-    margin: spacing.md,
-    marginTop: 0,
-    elevation: 2,
+  reportCard: {
+    marginBottom: spacing.sm,
   },
-  noReports: {
-    textAlign: 'center',
-    color: colors.textSecondary,
-    paddingVertical: spacing.lg,
+  reportCardDisabled: {
+    opacity: 0.5,
   },
-  reportItem: {
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+  reportCardContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  reportItemContent: {
+  reportCardLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  reportIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  reportText: {
     flex: 1,
-    marginLeft: spacing.md,
   },
   reportName: {
-    color: colors.text,
-    marginBottom: spacing.xs / 2,
+    fontWeight: '500',
   },
-  statusChip: {
-    alignSelf: 'flex-start',
-    marginTop: spacing.xs / 2,
+  reportNameDisabled: {
+    color: colors.textLight,
+  },
+  availableChip: {
+    marginTop: spacing.xs,
+    backgroundColor: colors.success + '20',
+  },
+  availableChipText: {
+    color: colors.success,
+    fontSize: 11,
+  },
+  reportActions: {
+    flexDirection: 'row',
+  },
+  statsCard: {
+    backgroundColor: colors.primary + '10',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    color: colors.primary,
+    fontWeight: 'bold',
+  },
+  statLabel: {
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
 });
