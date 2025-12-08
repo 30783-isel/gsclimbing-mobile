@@ -29,16 +29,20 @@ export const useOfflineProjects = () => {
   const saveProject = async (project: Partial<Project>) => {
     try {
       const newProject: Project = {
-        id: project.id || Date.now().toString(),
+        idProject: project.idProject || Date.now().toString(),
         name: project.name || '',
-        client: project.client || '',
-        status: project.status || 'active',
-        createdAt: project.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        country: project.country || '',
+        location: project.location || '',
+        numberTurbines: project.numberTurbines || '',
+        site: project.site || '',
+        number: project.number || '',
+        type: project.type || '',
+        users: project.users,
+        turbines: project.turbines,
       };
 
-      const updated = project.id
-        ? projects.map(p => p.id === project.id ? newProject : p)
+      const updated = project.idProject
+        ? projects.map(p => p.idProject === project.idProject ? newProject : p)
         : [...projects, newProject];
 
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
@@ -51,7 +55,7 @@ export const useOfflineProjects = () => {
 
   const deleteProject = async (id: string) => {
     try {
-      const updated = projects.filter(p => p.id !== id);
+      const updated = projects.filter(p => p.idProject !== id);
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       setProjects(updated);
     } catch (error) {
