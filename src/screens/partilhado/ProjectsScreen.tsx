@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
-import { Text, Card, FAB, Searchbar, Chip, IconButton } from 'react-native-paper';
+import { Text, Card, FAB, Searchbar, Chip, IconButton, Banner } from 'react-native-paper';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { useProjects } from '@/hooks/useProjects';
+import { useOfflineProjects } from '@/hooks/useOfflineProjects.hook';
 import { ProjectFormSheet } from '@/components/ProjectFormSheet';
 import { FiltersSheet } from '@/components/FiltersSheet';
 import { SyncStatus } from '@/components/SyncStatus';
+import { OfflineSyncIndicator } from '@/components/OfflineSyncIndicator.component';
 import { colors, spacing } from '@/constants/theme';
 import type { Project, ProjectFilters } from '@/types/project.types';
 
@@ -19,8 +21,19 @@ export default function ProjectsScreen({ userRole }: ProjectsScreenProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const { user, handleLogout } = useAuth();
+  
+  // ========== HOOKS OFFLINE ==========
+  // Hook offline - tem prioridade sobre dados online
+  const { 
+    projects: offlineProjects, 
+    isOnline, 
+    loading: offlineLoading, 
+    refresh: offlineRefresh 
+  } = useOfflineProjects();
+  
+  // Hook online - usado como fallback
   const {
-    projects,
+    projects: onlineProjects,
     isLoading,
     refreshing,
     loadProjects,
@@ -30,7 +43,13 @@ export default function ProjectsScreen({ userRole }: ProjectsScreenProps) {
     editProject,
     filterProjects,
   } = useProjects();
+  
+  // ========== LÓGICA DE DADOS ==========
+  // Usar dados offline se disponíveis, caso contrário usar online
+  const projects = offlineProjects.length > 0 ? offlineProjects : onlineProjects;
+  const loading = offlineLoading || isLoading;
 
+  // ========== ESTADOS ==========
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [sheetVisible, setSheetVisible] = useState(false);
@@ -40,15 +59,18 @@ export default function ProjectsScreen({ userRole }: ProjectsScreenProps) {
   const [activeFilters, setActiveFilters] = useState<ProjectFilters>({});
   const [hasActiveFilters, setHasActiveFilters] = useState(false);
 
-  // Verifica se é ADMIN (para mostrar/esconder funcionalidades)
+  // Verifica se é ADMIN
   const isAdmin = userRole === 'ADMIN';
 
-  // Carregar projetos ao montar componente
+  // ========== EFFECTS ==========
+  // Carregar projetos ao montar
   useEffect(() => {
-    loadProjects();
-  }, []);
+    if (isOnline) {
+      loadProjects(); // Tenta carregar online
+    }
+  }, [isOnline]);
 
-  // Filtrar projetos localmente quando muda a query ou filtros
+  // Filtrar projetos localmente
   useEffect(() => {
     let filtered = projects;
 
@@ -65,7 +87,7 @@ export default function ProjectsScreen({ userRole }: ProjectsScreenProps) {
     setFilteredProjects(filtered);
   }, [searchQuery, projects]);
 
-  // Verificar se há filtros ativos
+  // Verificar filtros ativos
   useEffect(() => {
     const hasFilters = Object.values(activeFilters).some(
       (value) => value && value.trim() !== ''
@@ -73,56 +95,88 @@ export default function ProjectsScreen({ userRole }: ProjectsScreenProps) {
     setHasActiveFilters(hasFilters);
   }, [activeFilters]);
 
+  // ========== HANDLERS ==========
   const handleProjectPress = (project: Project) => {
     setSelectedProject(project);
-    // Redireciona para a rota correta conforme o role
-    const basePath = isAdmin ? '/(tabs)/admin' : '/(tabs)/tech';
-    router.push(`${basePath}/project/${project.idProject}`);
+    const basePath = isAdmin ? '/(tabs)/admin/project' : '/(tabs)/tech/project';
+    router.push(`${basePath}/${project.idProject}`);
   };
 
-  const handleCreateProject = () => {
+  const handleAddProject = () => {
     setSheetMode('create');
     setSelectedForEdit(null);
     setSheetVisible(true);
   };
 
-  const handleEditProject = (project: Project, event: any) => {
-    event?.stopPropagation();
+  const handleEditProject = (project: Project, e: any) => {
+    e.stopPropagation();
     setSheetMode('edit');
     setSelectedForEdit(project);
     setSheetVisible(true);
   };
 
-  const handleFormSubmit = async (data: any) => {
+  const handleSaveProject = async (data: any) => {
     if (sheetMode === 'create') {
       await createProject(data);
     } else if (selectedForEdit) {
       await editProject(selectedForEdit.idProject, data);
     }
-    await loadProjects();
+    setSheetVisible(false);
+    
+    // Refresh com prioridade para offline
+    if (isOnline) {
+      await offlineRefresh();
+    }
   };
 
   const handleApplyFilters = async (filters: ProjectFilters) => {
     setActiveFilters(filters);
-    await filterProjects(filters);
+    setFiltersSheetVisible(false);
+    
+    if (isOnline) {
+      await filterProjects(filters);
+    } else {
+      // Filtrar localmente quando offline
+      let filtered = projects;
+      if (filters.name) {
+        filtered = filtered.filter(p => 
+          p.name.toLowerCase().includes(filters.name!.toLowerCase())
+        );
+      }
+      if (filters.country) {
+        filtered = filtered.filter(p => 
+          p.country.toLowerCase().includes(filters.country!.toLowerCase())
+        );
+      }
+      if (filters.location) {
+        filtered = filtered.filter(p => 
+          p.location.toLowerCase().includes(filters.location!.toLowerCase())
+        );
+      }
+      setFilteredProjects(filtered);
+    }
   };
 
-  const handleClearFilters = async () => {
+  const handleClearFilters = () => {
     setActiveFilters({});
-    await loadProjects();
+    setFilteredProjects(projects);
   };
 
+  const handleRefresh = async () => {
+    if (isOnline) {
+      await offlineRefresh(); // Prioridade offline
+      await refreshProjects(); // Depois online
+    }
+  };
+
+  // ========== RENDER FUNCTIONS ==========
   const renderProjectCard = ({ item }: { item: Project }) => (
-    <TouchableOpacity
-      onPress={() => handleProjectPress(item)}
-      activeOpacity={0.7}
-    >
+    <TouchableOpacity onPress={() => handleProjectPress(item)}>
       <Card style={styles.projectCard}>
         <Card.Content>
-          {/* Header do Card */}
           <View style={styles.cardHeader}>
             <View style={styles.cardHeaderLeft}>
-              <Text variant="titleLarge" style={styles.projectName}>
+              <Text variant="titleMedium" style={styles.projectName}>
                 {item.name}
               </Text>
               <View style={styles.locationContainer}>
@@ -131,55 +185,32 @@ export default function ProjectsScreen({ userRole }: ProjectsScreenProps) {
                 </Text>
               </View>
             </View>
-            <IconButton
-              icon="chevron-right"
-              size={24}
-              iconColor={colors.primary}
-            />
-            {/* Botão de editar só visível para ADMIN */}
+            
             {isAdmin && (
               <IconButton
                 icon="pencil"
                 size={20}
-                iconColor={colors.primary}
                 onPress={(e) => handleEditProject(item, e)}
               />
             )}
           </View>
 
-          {/* Info Chips */}
           <View style={styles.chipsContainer}>
-            <Chip
-              icon="wind-turbine"
-              style={styles.chip}
-              textStyle={styles.chipText}
-            >
-              {item.numberTurbines} {t('GSCLIMBING.TURBINES')}
+            <Chip style={styles.chip} textStyle={styles.chipText}>
+              {item.site}
             </Chip>
-            
-            {item.site && (
-              <Chip
-                icon="map-marker"
-                style={styles.chip}
-                textStyle={styles.chipText}
-              >
-                {item.site}
-              </Chip>
-            )}
+            <Chip style={styles.chip} textStyle={styles.chipText}>
+              {item.numberTurbines} turbinas
+            </Chip>
           </View>
 
-          {/* Metadados */}
           <View style={styles.metadataContainer}>
-            {item.type && (
-              <Text variant="bodySmall" style={styles.metadata}>
-                Tipo: {item.type}
-              </Text>
-            )}
-            {item.number && (
-              <Text variant="bodySmall" style={styles.metadata}>
-                Nº: {item.number}
-              </Text>
-            )}
+            <Text variant="bodySmall" style={styles.metadata}>
+              {item.type}
+            </Text>
+            <Text variant="bodySmall" style={styles.metadata}>
+              • {item.rated}
+            </Text>
           </View>
         </Card.Content>
       </Card>
@@ -188,48 +219,47 @@ export default function ProjectsScreen({ userRole }: ProjectsScreenProps) {
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
-      <Text variant="headlineSmall" style={styles.emptyTitle}>
-        📂 Nenhum projeto encontrado
+      <Text variant="titleLarge" style={styles.emptyTitle}>
+        {searchQuery ? '🔍 Nenhum projeto encontrado' : '📋 Sem projetos'}
       </Text>
       <Text variant="bodyMedium" style={styles.emptyText}>
         {searchQuery
-          ? 'Tente uma pesquisa diferente'
-          : isAdmin ? 'Adicione o primeiro projeto' : 'Não existem projetos disponíveis'}
+          ? 'Tenta pesquisar com outros termos'
+          : isAdmin
+          ? 'Adiciona o teu primeiro projeto'
+          : 'Ainda não tens projetos atribuídos'}
       </Text>
     </View>
   );
 
   const renderHeader = () => (
-    <View style={styles.header}>
-      <View style={styles.headerTop}>
-        <View>
-          <Text variant="headlineMedium" style={styles.title}>
-            {t('GSCLIMBING.PROJECTS')}
-          </Text>
-          <Text variant="bodyMedium" style={styles.subtitle}>
-            Olá, {user?.username}! 👋
-          </Text>
-        </View>
-        <View style={styles.headerRight}>
-          <SyncStatus />
-          <IconButton
-            icon="logout"
-            size={24}
-            iconColor={colors.primary}
-            onPress={handleLogout}
-          />
-        </View>
-      </View>
+    <View style={styles.headerContainer}>
+      {/* ========== INDICADOR OFFLINE ========== */}
+      <OfflineSyncIndicator onSyncPress={offlineRefresh} compact />
+      
+      {/* ========== BANNER OFFLINE ========== */}
+      {!isOnline && (
+        <Banner
+          visible={!isOnline}
+          icon="wifi-off"
+          style={styles.offlineBanner}
+        >
+          📵 Modo Offline - A mostrar dados guardados localmente
+        </Banner>
+      )}
 
-      {/* Searchbar */}
+      {/* Sync Status */}
+      <SyncStatus />
+
+      {/* Search Bar */}
       <View style={styles.searchContainer}>
         <Searchbar
           placeholder={t('GSCLIMBING.SEARCH')}
           onChangeText={setSearchQuery}
           value={searchQuery}
-          style={styles.searchbar}
-          iconColor={colors.primary}
+          style={styles.searchBar}
         />
+        
         <IconButton
           icon={hasActiveFilters ? 'filter' : 'filter-outline'}
           size={24}
@@ -242,7 +272,7 @@ export default function ProjectsScreen({ userRole }: ProjectsScreenProps) {
         />
       </View>
 
-      {/* Active Filters Chips */}
+      {/* Active Filters */}
       {hasActiveFilters && (
         <View style={styles.activeFiltersContainer}>
           {Object.entries(activeFilters).map(([key, value]) =>
@@ -291,6 +321,7 @@ export default function ProjectsScreen({ userRole }: ProjectsScreenProps) {
     </View>
   );
 
+  // ========== RENDER PRINCIPAL ==========
   return (
     <View style={styles.container}>
       <FlatList
@@ -302,48 +333,45 @@ export default function ProjectsScreen({ userRole }: ProjectsScreenProps) {
         contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
-            onRefresh={refreshProjects}
+            refreshing={loading}
+            onRefresh={handleRefresh}
             colors={[colors.primary]}
           />
         }
         showsVerticalScrollIndicator={false}
       />
 
-      {/* FAB - Adicionar Projeto - Só visível para ADMIN */}
-      {isAdmin && (
+      {/* FAB - Só para ADMIN e ONLINE */}
+      {isAdmin && isOnline && (
         <FAB
           icon="plus"
-          label={t('GSCLIMBING.ADD_PROJECT')}
           style={styles.fab}
-          onPress={handleCreateProject}
+          onPress={handleAddProject}
+          label={t('GSCLIMBING.ADD')}
         />
       )}
 
-      {/* Sheets - Só visíveis para ADMIN */}
-      {isAdmin && (
-        <>
-          <ProjectFormSheet
-            visible={sheetVisible}
-            onDismiss={() => setSheetVisible(false)}
-            onSubmit={handleFormSubmit}
-            mode={sheetMode}
-            //initialData={selectedForEdit}
-          />
+      {/* Project Form Sheet */}
+      <ProjectFormSheet
+        visible={sheetVisible}
+        mode={sheetMode}
+        project={selectedForEdit}
+        onDismiss={() => setSheetVisible(false)}
+        onSave={handleSaveProject}
+        onSubmit={handleSaveProject}
+      />
 
-          <FiltersSheet
-            visible={filtersSheetVisible}
-            onDismiss={() => setFiltersSheetVisible(false)}
-            onApply={handleApplyFilters}
-            //onClear={handleClearFilters}
-            //activeFilters={activeFilters}
-          />
-        </>
-      )}
+      {/* Filters Sheet */}
+      <FiltersSheet
+        visible={filtersSheetVisible}    
+        onDismiss={() => setFiltersSheetVisible(false)}
+        onApply={handleApplyFilters}
+      />
     </View>
   );
 }
 
+// ========== STYLES ==========
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -351,57 +379,38 @@ const styles = StyleSheet.create({
   },
   listContent: {
     flexGrow: 1,
-    paddingBottom: 80,
+    paddingBottom: spacing.xxl,
   },
-  header: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingTop: 40,
-    paddingBottom: spacing.md,
-    marginBottom: spacing.md,
+  headerContainer: {
+    padding: spacing.md,
+    gap: spacing.md,
   },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  title: {
-    color: colors.white,
-    fontWeight: 'bold',
-  },
-  subtitle: {
-    color: colors.white,
-    marginTop: spacing.xs,
+  offlineBanner: {
+    backgroundColor: '#FFA726',
+    marginBottom: spacing.sm,
   },
   searchContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
     gap: spacing.sm,
-    marginBottom: spacing.sm,
+    alignItems: 'center',
   },
-  searchbar: {
+  searchBar: {
     flex: 1,
-    elevation: 0,
+    elevation: 2,
   },
   filterButton: {
     margin: 0,
   },
   filterButtonActive: {
-    backgroundColor: colors.white + '20',
+    backgroundColor: colors.primary + '20',
   },
   activeFiltersContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
+    gap: spacing.sm,
   },
   filterChip: {
-    backgroundColor: colors.white + '20',
+    backgroundColor: colors.primary + '20',
   },
   filterChipText: {
     color: colors.primary,

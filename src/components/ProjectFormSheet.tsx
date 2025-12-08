@@ -11,6 +11,7 @@ interface ProjectFormSheetProps {
   onSubmit: (data: CreateProjectDTO | UpdateProjectDTO) => Promise<void>;
   project?: Project | null;
   mode: 'create' | 'edit';
+  onSave: (data: Partial<Project>) => Promise<void>;
 }
 
 export const ProjectFormSheet: React.FC<ProjectFormSheetProps> = ({
