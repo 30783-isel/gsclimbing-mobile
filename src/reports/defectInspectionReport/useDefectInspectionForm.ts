@@ -7,7 +7,7 @@ import type {
   AdditionalField,
   DefectInspectionReportDTO,
 } from '@/reports/defectInspectionReport/defectInspectionReport.types';
-import { defectInspectionReportAPI } from '@/reports/defectInspectionReport/defectInspectionReport.api';
+import { defectInspectionReportAPI } from '@/services/api/defectInspectionReport.api';
 import { useAuthStore } from '@/store/authStore';
 
 const TOTAL_STEPS = 4;

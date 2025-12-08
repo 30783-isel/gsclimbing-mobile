@@ -15,7 +15,7 @@ import {
 } from 'react-native-paper';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { colors, spacing } from '@/constants/theme';
-import { defectInspectionReportAPI } from '@/reports/defectInspectionReport/defectInspectionReport.api';
+import { defectInspectionReportAPI } from '@/services/api/defectInspectionReport.api';
 import { reportPhotosAPI, type ReportPhotoData } from '@/services/api/reportPhotos.api';
 import type { DefectInspectionReportResponse } from '@/reports/defectInspectionReport/defectInspectionReport.types';
 import { PhotoGallery } from '@/components/PhotoGallery';
