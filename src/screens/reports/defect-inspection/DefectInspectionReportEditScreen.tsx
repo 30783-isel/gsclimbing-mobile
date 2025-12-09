@@ -306,60 +306,76 @@ export default function DefectInspectionReportEditScreen() {
   };
 
   // Guardar alterações
-  const handleSave = async () => {
-    if (!validateForm()) return;
+const handleSave = async () => {
+  if (!validateForm()) return;
 
-    try {
-      setSaving(true);
-      setUploadProgress(0);
+  try {
+    setSaving(true);
+    setUploadProgress(0);
 
-      // ========================================
-      // MODO OFFLINE: Guardar localmente
-      // ========================================
-      if (!isOnline) {
-        console.log('📵 Guardando relatório offline...');
+    // ========================================
+    // DECISÃO 1: VERIFICAR SE ESTÁ OFFLINE
+    // ========================================
+    const netState = await NetInfo.fetch();
+    const currentlyOnline = netState.isConnected ?? false;
 
-        // Preparar fotos offline
-        const offlinePhotos: OfflinePhoto[] = photos
-          .filter(p => p.uri)
-          .map((p, i) => ({
-            tempId: `photo-${i}`,
-            uri: p.uri,
-            filename: p.uri.split('/').pop() || `photo-${i}.jpg`,
-            mimeType: 'image/jpeg',
-          }));
+    console.log('💾 A guardar relatório...');
+    console.log('📡 Estado conexão:', currentlyOnline ? 'ONLINE' : 'OFFLINE');
+    console.log('📝 Modo:', reportId === 0 ? 'CRIAR' : 'EDITAR');
+    console.log('📵 É offline?', isOfflineMode);
 
-        // Preparar campos adicionais
-        const additionalData: Record<string, { label: string; value: string }> = {};
-        additionalFields.forEach((field, index) => {
-          if (field.label && field.value) {
-            additionalData[`additionalField${index + 1}`] = {
-              label: field.label,
-              value: field.value,
-            };
-          }
+    // ========================================
+    // OPÇÃO A: ESTÁ OFFLINE → GUARDAR LOCALMENTE
+    // ========================================
+    if (!currentlyOnline) {
+      console.log('📵 SEM REDE → Guardando localmente...');
+
+      // Preparar fotos offline
+      const offlinePhotos: OfflinePhoto[] = photos
+        .filter(p => p.uri)
+        .map((p, i) => ({
+          tempId: `photo-${i}`,
+          uri: p.uri,
+          filename: p.uri.split('/').pop() || `photo-${i}.jpg`,
+          mimeType: 'image/jpeg',
+        }));
+
+      // Preparar campos adicionais
+      const additionalData: Record<string, { label: string; value: string }> = {};
+      additionalFields.forEach((field, index) => {
+        if (field.label && field.value) {
+          additionalData[`additionalField${index + 1}`] = {
+            label: field.label,
+            value: field.value,
+          };
+        }
+      });
+
+      // A.1: Se está a EDITAR relatório offline existente
+      if (isOfflineMode && tempId) {
+        console.log('✏️ Atualizando relatório offline existente:', tempId);
+        
+        await offlineReportsService.update(tempId, {
+          data: {
+            site,
+            wtgNumber,
+            wtgType,
+            yearConstruction,
+            ...additionalData,
+          },
+          photos: offlinePhotos,
         });
 
-        // Se é edição de relatório offline existente
-        if (isOfflineMode && tempId) {
-          await offlineReportsService.update(tempId, {
-            data: {
-              site,
-              wtgNumber,
-              wtgType,
-              yearConstruction,
-              ...additionalData,
-            },
-            photos: offlinePhotos,
-          });
+        Alert.alert('Sucesso', 'Relatório offline atualizado!', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+        return;
+      }
 
-          Alert.alert('Sucesso', 'Relatório offline atualizado!', [
-            { text: 'OK', onPress: () => router.back() },
-          ]);
-          return;
-        }
-
-        // Se é criação de novo relatório offline
+      // A.2: Se está a CRIAR novo relatório (reportId === 0)
+      if (reportId === 0) {
+        console.log('📝 Criando NOVO relatório offline...');
+        
         const offlineReport = await offlineReportsService.create({
           projectId: projectId || 0,
           turbineId: turbineId || 0,
@@ -375,98 +391,182 @@ export default function DefectInspectionReportEditScreen() {
           photos: offlinePhotos,
         });
 
-        // Marcar para sincronização automática
+        console.log('✅ Relatório offline criado:', offlineReport.tempId);
+
+        // Marcar para sincronização automática quando houver rede
         await offlineReportsService.markForSync(offlineReport.tempId);
+        console.log('📤 Marcado para sincronização automática');
 
         Alert.alert(
-          'Relatório Guardado',
-          'O relatório foi guardado offline e será sincronizado quando houver conexão.',
+          'Relatório Guardado Offline',
+          'O relatório foi guardado localmente e será sincronizado automaticamente quando houver conexão.',
           [{ text: 'OK', onPress: () => router.back() }]
         );
         return;
       }
 
-      // ========================================
-      // MODO ONLINE: Upload e API
-      // ========================================
+      // A.3: Se está a EDITAR relatório online mas sem rede
+      // (caso raro - abriu relatório online mas perdeu conexão)
+      if (reportId > 0) {
+        Alert.alert(
+          'Sem Conexão',
+          'Não é possível editar este relatório online sem conexão. Tente novamente quando houver rede.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+    }
 
-      // Upload de fotos novas
-      const photoFileIds: number[] = [];
-      for (const photo of photos) {
-        if (photo.uri && !photo.isUploaded) {
+    // ========================================
+    // OPÇÃO B: ESTÁ ONLINE → USAR API
+    // ========================================
+    console.log('🌐 COM REDE → Usando API...');
+
+    // B.1: Upload de fotos novas
+    const photoFileIds: number[] = [];
+    const photosToUpload = photos.filter(p => p.uri && !p.isUploaded);
+
+    console.log(`📸 Fotos a fazer upload: ${photosToUpload.length}`);
+
+    for (let i = 0; i < photosToUpload.length; i++) {
+      const photo = photosToUpload[i];
+      
+      console.log(`📤 Uploading foto ${i + 1}/${photosToUpload.length}...`);
+
+      const formData = new FormData();
+      formData.append('file', {
+        uri: photo.uri,
+        type: 'image/jpeg',
+        name: photo.uri.split('/').pop() || `photo-${i}.jpg`,
+      } as any);
+
+      // Se é criação (reportId === 0), precisa criar relatório primeiro
+      // Por isso, vamos guardar as fotos localmente e fazer upload depois
+      if (reportId === 0) {
+        // Para criação, não temos UUID ainda
+        // Vamos ter que criar o relatório primeiro, depois fazer upload
+        break;
+      }
+
+      const uploadResponse = await httpClient.post(
+        `${API_CONFIG.baseFilesUrl}upload/${reportUuid}`,
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          onUploadProgress: (progressEvent) => {
+            const progress = (i + progressEvent.loaded / progressEvent.total) / photosToUpload.length;
+            setUploadProgress(progress);
+          },
+        }
+      );
+
+      photoFileIds.push(uploadResponse.data.fileId);
+      console.log(`✅ Foto ${i + 1} uploaded, fileId:`, uploadResponse.data.fileId);
+    }
+
+    // Adicionar IDs de fotos já existentes (para edição)
+    photos.forEach(photo => {
+      if (photo.fileId) {
+        photoFileIds.push(Number(photo.fileId));
+      }
+    });
+
+    // B.2: Preparar payload
+    const reportData: any = {
+      site,
+      wtgNumber,
+      wtgType,
+      yearConstruction,
+      photoFileIds,
+    };
+
+    // Adicionar campos adicionais
+    additionalFields.forEach((field, index) => {
+      if (field.label && field.value) {
+        reportData[`additionalField${index + 1}`] = {
+          label: field.label,
+          value: field.value,
+        };
+      }
+    });
+
+    console.log('📤 Payload:', JSON.stringify(reportData, null, 2));
+
+    // B.3: CRIAR ou EDITAR via API
+    if (reportId === 0) {
+      // CRIAR novo relatório
+      console.log('📝 Criando relatório via API...');
+      
+      const createdReport = await defectInspectionReportAPI.create({
+        ...reportData,
+        turbineId: turbineId || 0,
+        language: 'EN',
+      });
+
+      console.log('✅ Relatório criado via API:', createdReport.reportId);
+
+      // Se tinha fotos, fazer upload agora
+      if (photosToUpload.length > 0) {
+        console.log(`📸 Agora fazendo upload de ${photosToUpload.length} fotos...`);
+        
+        for (let i = 0; i < photosToUpload.length; i++) {
+          const photo = photosToUpload[i];
+          
           const formData = new FormData();
           formData.append('file', {
             uri: photo.uri,
             type: 'image/jpeg',
-            name: photo.uri.split('/').pop() || 'photo.jpg',
+            name: photo.uri.split('/').pop() || `photo-${i}.jpg`,
           } as any);
 
-          const uploadResponse = await httpClient.post(
-            `${API_CONFIG.baseFilesUrl}upload/${reportUuid || 'temp'}`,
+          await httpClient.post(
+            `${API_CONFIG.baseFilesUrl}upload/${createdReport.uuid}`,
             formData,
             {
               headers: { 'Content-Type': 'multipart/form-data' },
               onUploadProgress: (progressEvent) => {
-                const progress = progressEvent.loaded / progressEvent.total;
+                const progress = (i + progressEvent.loaded / progressEvent.total) / photosToUpload.length;
                 setUploadProgress(progress);
               },
             }
           );
-
-          photoFileIds.push(uploadResponse.data.fileId);
-        } else if (photo.fileId) {
-          photoFileIds.push(Number(photo.fileId));
+          
+          console.log(`✅ Foto ${i + 1} uploaded após criação`);
         }
       }
 
-      // Preparar payload
-      const reportData: any = {
-        site,
-        wtgNumber,
-        wtgType,
-        yearConstruction,
-        photoFileIds,
-      };
+      Alert.alert('Sucesso', 'Relatório criado com sucesso!', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } else {
+      // EDITAR relatório existente
+      console.log('✏️ Atualizando relatório via API:', reportId);
+      
+      await defectInspectionReportAPI.update(reportId, reportData);
+      
+      console.log('✅ Relatório atualizado via API');
 
-      // Adicionar campos adicionais
-      additionalFields.forEach((field, index) => {
-        if (field.label && field.value) {
-          reportData[`additionalField${index + 1}`] = {
-            label: field.label,
-            value: field.value,
-          };
-        }
-      });
-
-      // Se é criação (reportId === 0), criar novo
-      if (reportId === 0) {
-        await defectInspectionReportAPI.create({
-          ...reportData,
-          turbineId: turbineId || 0,
-          language: 'EN',
-        });
-
-        Alert.alert('Sucesso', 'Relatório criado com sucesso!', [
-          { text: 'OK', onPress: () => router.back() },
-        ]);
-      }
-      // Se é edição (reportId > 0), atualizar
-      else {
-        await defectInspectionReportAPI.update(reportId, reportData);
-
-        Alert.alert('Sucesso', 'Relatório atualizado com sucesso!', [
-          { text: 'OK', onPress: () => router.back() },
-        ]);
-      }
-
-    } catch (error: any) {
-      console.error('❌ Erro ao guardar relatório:', error);
-      Alert.alert('Erro', 'Não foi possível guardar o relatório');
-    } finally {
-      setSaving(false);
-      setUploadProgress(0);
+      Alert.alert('Sucesso', 'Relatório atualizado com sucesso!', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
     }
-  };
+
+  } catch (error: any) {
+    console.error('❌ Erro ao guardar relatório:', error);
+    console.error('❌ Detalhes:', {
+      message: error.message,
+      response: error.response?.data,
+    });
+    
+    Alert.alert(
+      'Erro', 
+      error.response?.data?.message || error.message || 'Não foi possível guardar o relatório'
+    );
+  } finally {
+    setSaving(false);
+    setUploadProgress(0);
+  }
+};
 
   // Solicitar permissões
   const requestPermissions = async () => {
