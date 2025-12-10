@@ -2,7 +2,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { projectsAPI } from '../api/projects.api';
 import { turbineAPI } from '../api/turbine.api';
-import { reportsAPI } from '../api/reports.api';
 
 const CACHE_KEYS = {
   PROJECTS: '@cache:projects',
@@ -75,6 +74,62 @@ class DataCacheService {
     } catch (error) {
       console.error('❌ Erro ao obter turbinas:', error);
       return [];
+    }
+  }
+
+  /**
+   * Cache de relatórios genérico (para ser usado por tipos específicos de relatório)
+   * Guarda dados já processados no cache
+   */
+  async cacheReportsData(turbineId: number, reports: any[]): Promise<void> {
+    try {
+      const key = `${CACHE_KEYS.REPORTS}_${turbineId}`;
+      await AsyncStorage.setItem(key, JSON.stringify(reports));
+      await this.setLastFetch(`reports_${turbineId}`);
+      console.log('✅ Relatórios em cache:', reports.length);
+    } catch (error) {
+      console.error('❌ Erro ao fazer cache de relatórios:', error);
+    }
+  }
+
+  /**
+   * Obter relatórios do cache
+   */
+  async getReportsFromCache(turbineId: number): Promise<any[]> {
+    try {
+      const key = `${CACHE_KEYS.REPORTS}_${turbineId}`;
+      const cached = await AsyncStorage.getItem(key);
+      return cached ? JSON.parse(cached) : [];
+    } catch (error) {
+      console.error('❌ Erro ao obter relatórios:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Cache de um relatório específico (para detalhes)
+   */
+  async cacheReportData(reportId: number, report: any): Promise<void> {
+    try {
+      const key = `${CACHE_KEYS.REPORTS}_detail_${reportId}`;
+      await AsyncStorage.setItem(key, JSON.stringify(report));
+      console.log('✅ Relatório em cache:', reportId);
+    } catch (error) {
+      console.error('❌ Erro ao fazer cache de relatório:', error);
+    }
+  }
+
+  /**
+   * Obter relatório específico do cache
+   */
+  async getReportFromCache(reportId: number): Promise<any | null> {
+    try {
+      const key = `${CACHE_KEYS.REPORTS}_detail_${reportId}`;
+      const cached = await AsyncStorage.getItem(key);
+      return cached ? JSON.parse(cached) : null;
+    } catch (error) {
+      console.error('❌ Erro ao obter relatório:', error);
+      return null;
     }
   }
 

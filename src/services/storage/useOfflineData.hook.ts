@@ -94,3 +94,99 @@ export function useOfflineTurbines(projectId: number) {
     refresh,
   };
 }
+
+export function useOfflineReports(turbineId: number) {
+  const [reports, setReports] = useState([]);
+  const [isOnline, setIsOnline] = useState(true);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOnline(state.isConnected ?? false);
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    if (turbineId) {
+      loadReports();
+    }
+  }, [turbineId]);
+
+  const loadReports = async () => {
+    setLoading(true);
+    try {
+      const data = await dataCacheService.getReports(turbineId, isOnline);
+      setReports(data);
+    } catch (error) {
+      console.error('❌ Erro ao carregar relatórios:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refresh = async () => {
+    await dataCacheService.cacheReports(turbineId);
+    await loadReports();
+  };
+
+  return {
+    reports,
+    isOnline,
+    loading,
+    refresh,
+  };
+}
+
+export function useOfflineReport(reportId: number) {
+  const [report, setReport] = useState<any>(null);
+  const [isOnline, setIsOnline] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [loadedFromCache, setLoadedFromCache] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOnline(state.isConnected ?? false);
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    if (reportId) {
+      loadReport();
+    }
+  }, [reportId]);
+
+  const loadReport = async () => {
+    setLoading(true);
+    setLoadedFromCache(false);
+    
+    try {
+      const data = await dataCacheService.getReport(reportId, isOnline);
+      
+      if (data) {
+        setReport(data);
+        setLoadedFromCache(!isOnline);
+      } else if (!isOnline) {
+        throw new Error('Relatório não disponível offline. Abra-o online primeiro.');
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar relatório:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refresh = async () => {
+    await dataCacheService.cacheReport(reportId);
+    await loadReport();
+  };
+
+  return {
+    report,
+    isOnline,
+    loading,
+    loadedFromCache,
+    refresh,
+  };
+}
