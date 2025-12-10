@@ -116,7 +116,9 @@ export function useOfflineReports(turbineId: number) {
   const loadReports = async () => {
     setLoading(true);
     try {
-      const data = await dataCacheService.getReports(turbineId, isOnline);
+      // NOTA: Este hook agora apenas lê do cache
+      // O componente que usa este hook deve fazer o cache usando a API específica
+      const data = await dataCacheService.getReportsFromCache(turbineId);
       setReports(data);
     } catch (error) {
       console.error('❌ Erro ao carregar relatórios:', error);
@@ -126,7 +128,8 @@ export function useOfflineReports(turbineId: number) {
   };
 
   const refresh = async () => {
-    await dataCacheService.cacheReports(turbineId);
+    // O refresh agora deve ser feito pelo componente usando a API específica
+    // Este método apenas recarrega do cache
     await loadReports();
   };
 
@@ -162,11 +165,13 @@ export function useOfflineReport(reportId: number) {
     setLoadedFromCache(false);
     
     try {
-      const data = await dataCacheService.getReport(reportId, isOnline);
+      // NOTA: Este hook agora apenas lê do cache
+      // O componente que usa este hook deve fazer o cache usando a API específica
+      const data = await dataCacheService.getReportFromCache(reportId);
       
       if (data) {
         setReport(data);
-        setLoadedFromCache(!isOnline);
+        setLoadedFromCache(true);
       } else if (!isOnline) {
         throw new Error('Relatório não disponível offline. Abra-o online primeiro.');
       }
@@ -178,7 +183,8 @@ export function useOfflineReport(reportId: number) {
   };
 
   const refresh = async () => {
-    await dataCacheService.cacheReport(reportId);
+    // O refresh agora deve ser feito pelo componente usando a API específica
+    // Este método apenas recarrega do cache
     await loadReport();
   };
 
