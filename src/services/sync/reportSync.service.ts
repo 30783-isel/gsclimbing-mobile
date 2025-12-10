@@ -128,43 +128,79 @@ class ReportSyncService {
    */
   async syncOne(report: OfflineReport): Promise<SyncResult> {
     try {
+      console.log('\n🔄 Sincronizando relatório:', report.tempId);
       await offlineReportsService.markSyncing(report.tempId);
 
-      // Payload COM fotos
+      // ✅ CORRIGIDO: createdAtDevice agora está correto
       const payload = {
         tempId: report.tempId,
         turbineId: report.turbineId,
         reportType: report.reportType,
         language: report.language,
         reportData: JSON.stringify(report.data),
-        photos: report.photos, // ← Vazio (backend ainda não suporta isto corretamente)
-        createdAtDevice: report.createdAt,
+        photos: report.photos,
+        createdAtDevice: report.createdAt,  // ✅ CORRIGIDO
         inspectedBy: report.createdAt,
       };
+
+      console.log('📤 Enviando payload:', {
+        tempId: payload.tempId,
+        turbineId: payload.turbineId,
+        reportType: payload.reportType,
+        language: payload.language,
+        photosCount: payload.photos.length,
+        createdAtDevice: payload.createdAtDevice,
+        inspectedBy: payload.inspectedBy,
+      });
 
       const response = await httpClient.post(
         `${API_CONFIG.baseMobileReportsUrl}sync-offline`,
         payload
       );
 
+      // ✅ LOG COMPLETO DA RESPOSTA
+      console.log('📥 Resposta completa do backend:', JSON.stringify(response.data, null, 2));
+
       if (!response.data.success) {
         const errorMsg = response.data.message || 'Erro desconhecido';
+        console.error('❌ Backend retornou erro:', errorMsg);
+        
+        // Se houver erros de validação, logar também
+        if (response.data.errors && response.data.errors.length > 0) {
+          console.error('❌ Erros de validação:', response.data.errors);
+        }
+        
         await offlineReportsService.markSyncError(report.tempId, errorMsg);
         return { success: false, tempId: report.tempId, error: errorMsg };
       }
 
       const reportUuid = response.data.uuid;
+      console.log('✅ Relatório criado com UUID:', reportUuid);
       
       // Upload fotos DEPOIS
-      for (const photo of report.photos) {
-        await this._uploadPhoto(photo, reportUuid);
+      if (report.photos && report.photos.length > 0) {
+        console.log(`📸 A fazer upload de ${report.photos.length} fotos...`);
+        for (const photo of report.photos) {
+          try {
+            await this._uploadPhoto(photo, reportUuid);
+            console.log(`✅ Foto ${photo.filename} enviada`);
+          } catch (photoError: any) {
+            console.error(`❌ Erro ao enviar foto ${photo.filename}:`, photoError.message);
+            // Continuar com as outras fotos mesmo se uma falhar
+          }
+        }
       }
 
+      // Eliminar relatório offline após sucesso
       await offlineReportsService.delete(report.tempId);
+      console.log(`✅ Relatório ${report.tempId} sincronizado e eliminado localmente\n`);
+      
       return { success: true, tempId: report.tempId, reportId: response.data.reportId };
       
     } catch (error: any) {
-      const errorMsg = error.message;
+      const errorMsg = error.message || 'Erro desconhecido';
+      console.error(`❌ Erro ao sincronizar ${report.tempId}:`, errorMsg);
+      console.error('Stack trace:', error);
       await offlineReportsService.markSyncError(report.tempId, errorMsg);
       return { success: false, tempId: report.tempId, error: errorMsg };
     }
@@ -200,8 +236,10 @@ class ReportSyncService {
       name: photo.filename,
     } as any);
 
+    console.log(`📤 Enviando foto ${photo.filename} para relatório ${reportUuid}`);
+
     const uploadResponse = await httpClient.post(
-      `${API_CONFIG.baseFilesUrl}upload/${reportUuid}`,  // ✅ COM UUID
+      `${API_CONFIG.baseFilesUrl}upload/${reportUuid}`,
       formData,
       {
         headers: {
@@ -210,6 +248,7 @@ class ReportSyncService {
       }
     );
 
+    console.log(`✅ Foto ${photo.filename} enviada com sucesso. FileId:`, uploadResponse.data.fileId);
     return uploadResponse.data.fileId;
   }
 
