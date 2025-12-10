@@ -1,5 +1,5 @@
 /**
- * Report Sync Service
+ * Report Sync Service - VERSÃO COM DEBUG DE FOTOS
  * Sincroniza relatórios offline com o servidor quando há conexão
  */
 
@@ -34,7 +34,6 @@ class ReportSyncService {
    * Inicializar listeners de conexão automática
    */
   initialize() {
-    // Ouvir mudanças de conexão
     NetInfo.addEventListener(state => {
       if (state.isConnected && !this.isSyncing) {
         console.log('🌐 Conexão detectada, iniciando sincronização automática...');
@@ -49,7 +48,6 @@ class ReportSyncService {
    * Sincronizar todos os relatórios pendentes
    */
   async syncAll(): Promise<SyncSummary> {
-    // Verificar conexão
     const networkState = await NetInfo.fetch();
     if (!networkState.isConnected) {
       console.log('📵 Sem conexão, sincronização cancelada');
@@ -93,8 +91,6 @@ class ReportSyncService {
       for (const report of pendingReports) {
         const result = await this.syncOne(report);
         results.push(result);
-
-        // Pequeno delay entre pedidos
         await this._delay(500);
       }
 
@@ -107,10 +103,7 @@ class ReportSyncService {
 
       console.log(`✅ Sincronização concluída: ${summary.succeeded}/${summary.total} sucesso`);
 
-      // Notificar listeners
       this._notifyListeners(summary);
-
-      // Atualizar timestamp
       await offlineReportsService.setLastSync();
 
       this.isSyncing = false;
@@ -128,10 +121,12 @@ class ReportSyncService {
    */
   async syncOne(report: OfflineReport): Promise<SyncResult> {
     try {
-      console.log('\n🔄 Sincronizando relatório:', report.tempId);
+      console.log('\n🔄 ========================================');
+      console.log('🔄 Sincronizando relatório:', report.tempId);
+      console.log('🔄 ========================================');
+      
       await offlineReportsService.markSyncing(report.tempId);
 
-      // ✅ CORRIGIDO: createdAtDevice agora está correto
       const payload = {
         tempId: report.tempId,
         turbineId: report.turbineId,
@@ -139,7 +134,7 @@ class ReportSyncService {
         language: report.language,
         reportData: JSON.stringify(report.data),
         photos: report.photos,
-        createdAtDevice: report.createdAt,  // ✅ CORRIGIDO
+        createdAtDevice: report.createdAt,
         inspectedBy: report.createdAt,
       };
 
@@ -150,7 +145,6 @@ class ReportSyncService {
         language: payload.language,
         photosCount: payload.photos.length,
         createdAtDevice: payload.createdAtDevice,
-        inspectedBy: payload.inspectedBy,
       });
 
       const response = await httpClient.post(
@@ -158,14 +152,12 @@ class ReportSyncService {
         payload
       );
 
-      // ✅ LOG COMPLETO DA RESPOSTA
-      console.log('📥 Resposta completa do backend:', JSON.stringify(response.data, null, 2));
+      console.log('📥 Resposta do backend:', JSON.stringify(response.data, null, 2));
 
       if (!response.data.success) {
         const errorMsg = response.data.message || 'Erro desconhecido';
         console.error('❌ Backend retornou erro:', errorMsg);
         
-        // Se houver erros de validação, logar também
         if (response.data.errors && response.data.errors.length > 0) {
           console.error('❌ Erros de validação:', response.data.errors);
         }
@@ -177,18 +169,66 @@ class ReportSyncService {
       const reportUuid = response.data.uuid;
       console.log('✅ Relatório criado com UUID:', reportUuid);
       
-      // Upload fotos DEPOIS
+      // ========================================
+      // UPLOAD DE FOTOS
+      // ========================================
       if (report.photos && report.photos.length > 0) {
-        console.log(`📸 A fazer upload de ${report.photos.length} fotos...`);
-        for (const photo of report.photos) {
+        console.log(`\n📸 ========================================`);
+        console.log(`📸 Iniciando upload de ${report.photos.length} fotos...`);
+        console.log(`📸 ========================================\n`);
+        
+        let uploadedCount = 0;
+        let failedCount = 0;
+        
+        for (let i = 0; i < report.photos.length; i++) {
+          const photo = report.photos[i];
+          
           try {
-            await this._uploadPhoto(photo, reportUuid);
-            console.log(`✅ Foto ${photo.filename} enviada`);
+            console.log(`\n📷 Foto ${i + 1}/${report.photos.length}:`);
+            console.log(`   - Filename: ${photo.filename}`);
+            console.log(`   - URI: ${photo.uri}`);
+            console.log(`   - MimeType: ${photo.mimeType}`);
+            console.log(`   - TempId: ${photo.tempId}`);
+            
+            // Verificar se o URI existe e é válido
+            if (!photo.uri || photo.uri.trim() === '') {
+              console.warn(`⚠️ Foto ${i + 1} tem URI vazio, a saltar...`);
+              failedCount++;
+              continue;
+            }
+            
+            const fileId = await this._uploadPhoto(photo, reportUuid);
+            uploadedCount++;
+            console.log(`✅ Foto ${i + 1} enviada com sucesso! FileId: ${fileId}`);
+            
           } catch (photoError: any) {
-            console.error(`❌ Erro ao enviar foto ${photo.filename}:`, photoError.message);
-            // Continuar com as outras fotos mesmo se uma falhar
+            failedCount++;
+            console.error(`❌ Erro ao enviar foto ${i + 1}:`, photoError.message);
+            console.error(`   - Stack:`, photoError.stack);
+            
+            // Verificar se é erro de rede ou servidor
+            if (photoError.response) {
+              console.error(`   - Status HTTP: ${photoError.response.status}`);
+              console.error(`   - Resposta:`, JSON.stringify(photoError.response.data, null, 2));
+            }
+            
+            // NÃO parar o processo, continuar com as outras fotos
           }
         }
+        
+        console.log(`\n📸 ========================================`);
+        console.log(`📸 Resultado do upload de fotos:`);
+        console.log(`   ✅ Sucesso: ${uploadedCount}`);
+        console.log(`   ❌ Falhas: ${failedCount}`);
+        console.log(`   📊 Total: ${report.photos.length}`);
+        console.log(`📸 ========================================\n`);
+        
+        // Mesmo que algumas fotos falharam, considerar sucesso se o relatório foi criado
+        if (uploadedCount === 0 && failedCount > 0) {
+          console.warn('⚠️ AVISO: Nenhuma foto foi enviada com sucesso!');
+        }
+      } else {
+        console.log('📸 Sem fotos para enviar');
       }
 
       // Eliminar relatório offline após sucesso
@@ -200,7 +240,7 @@ class ReportSyncService {
     } catch (error: any) {
       const errorMsg = error.message || 'Erro desconhecido';
       console.error(`❌ Erro ao sincronizar ${report.tempId}:`, errorMsg);
-      console.error('Stack trace:', error);
+      console.error('Stack trace:', error.stack);
       await offlineReportsService.markSyncError(report.tempId, errorMsg);
       return { success: false, tempId: report.tempId, error: errorMsg };
     }
@@ -215,12 +255,10 @@ class ReportSyncService {
 
     console.log(`🔄 Tentando novamente ${failedReports.length} relatórios com erro`);
 
-    // Marcar como pending novamente
     for (const report of failedReports) {
       await offlineReportsService.markForSync(report.tempId);
     }
 
-    // Sincronizar
     return this.syncAll();
   }
 
@@ -228,28 +266,57 @@ class ReportSyncService {
    * Upload de foto individual com UUID
    */
   private async _uploadPhoto(photo: OfflinePhoto, reportUuid: string): Promise<number> {
-    const formData = new FormData();
+    try {
+      console.log(`\n   📤 Preparando upload...`);
+      console.log(`   - Endpoint: ${API_CONFIG.baseFilesUrl}upload/${reportUuid}`);
+      
+      const formData = new FormData();
 
-    formData.append('file', {
-      uri: photo.uri,
-      type: photo.mimeType,
-      name: photo.filename,
-    } as any);
+      // CRÍTICO: Verificar formato do objeto de ficheiro
+      const fileObject = {
+        uri: photo.uri,
+        type: photo.mimeType || 'image/jpeg',
+        name: photo.filename,
+      };
+      
+      console.log(`   - File object:`, JSON.stringify(fileObject, null, 2));
+      
+      formData.append('file', fileObject as any);
 
-    console.log(`📤 Enviando foto ${photo.filename} para relatório ${reportUuid}`);
+      console.log(`   - FormData preparado, a enviar...`);
 
-    const uploadResponse = await httpClient.post(
-      `${API_CONFIG.baseFilesUrl}upload/${reportUuid}`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+      const uploadResponse = await httpClient.post(
+        `${API_CONFIG.baseFilesUrl}upload/${reportUuid}`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          timeout: 30000, // 30 segundos timeout
+        }
+      );
+
+      console.log(`   - Resposta recebida:`, uploadResponse.status);
+      console.log(`   - FileId:`, uploadResponse.data.fileId);
+
+      return uploadResponse.data.fileId;
+      
+    } catch (error: any) {
+      console.error(`   ❌ Erro no upload da foto:`);
+      console.error(`   - Message: ${error.message}`);
+      
+      if (error.response) {
+        console.error(`   - Status: ${error.response.status}`);
+        console.error(`   - Data:`, JSON.stringify(error.response.data, null, 2));
+      } else if (error.request) {
+        console.error(`   - Request foi feito mas sem resposta`);
+        console.error(`   - Request:`, error.request);
+      } else {
+        console.error(`   - Erro ao configurar request:`, error.message);
       }
-    );
-
-    console.log(`✅ Foto ${photo.filename} enviada com sucesso. FileId:`, uploadResponse.data.fileId);
-    return uploadResponse.data.fileId;
+      
+      throw error;
+    }
   }
 
   /**
@@ -258,7 +325,6 @@ class ReportSyncService {
   addSyncListener(listener: (summary: SyncSummary) => void): () => void {
     this.syncListeners.push(listener);
 
-    // Retornar função para remover listener
     return () => {
       const index = this.syncListeners.indexOf(listener);
       if (index > -1) {
