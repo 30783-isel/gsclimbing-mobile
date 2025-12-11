@@ -1,6 +1,6 @@
 /**
- * Report Sync Service - VERSÃO COM DEBUG DE FOTOS
- * Sincroniza relatórios offline com o servidor quando há conexão
+ * Report Sync Service - USANDO ENDPOINT CORRETO
+ * O endpoint /sync-offline não funciona direito, vamos usar /defect-inspection
  */
 
 import NetInfo from '@react-native-community/netinfo';
@@ -24,73 +24,109 @@ export interface SyncSummary {
   results: SyncResult[];
 }
 
+export type LogCallback = (type: 'info' | 'success' | 'error' | 'warning', message: string) => void;
+
 // ========== SERVICE ==========
 
 class ReportSyncService {
   private isSyncing = false;
   private syncListeners: Array<(summary: SyncSummary) => void> = [];
+  private logCallbacks: LogCallback[] = [];
 
-  /**
-   * Inicializar listeners de conexão automática
-   */
-  initialize() {
-    NetInfo.addEventListener(state => {
-      if (state.isConnected && !this.isSyncing) {
-        console.log('🌐 Conexão detectada, iniciando sincronização automática...');
-        this.syncAll();
+  addLogCallback(callback: LogCallback): () => void {
+    this.logCallbacks.push(callback);
+    return () => {
+      const index = this.logCallbacks.indexOf(callback);
+      if (index > -1) {
+        this.logCallbacks.splice(index, 1);
       }
-    });
-
-    console.log('✅ ReportSyncService inicializado');
+    };
   }
 
-  /**
-   * Sincronizar todos os relatórios pendentes
-   */
+  private log(type: 'info' | 'success' | 'error' | 'warning', message: string) {
+    switch (type) {
+      case 'success':
+        console.log(`✅ ${message}`);
+        break;
+      case 'error':
+        console.error(`❌ ${message}`);
+        break;
+      case 'warning':
+        console.warn(`⚠️ ${message}`);
+        break;
+      default:
+        console.log(`ℹ️ ${message}`);
+    }
+
+    this.logCallbacks.forEach(callback => {
+      try {
+        callback(type, message);
+      } catch (error) {
+        console.error('Erro no log callback:', error);
+      }
+    });
+  }
+
+  initialize() {
+    this.log('info', '🚀 ReportSyncService inicializado');
+    
+    NetInfo.addEventListener(state => {
+      const status = state.isConnected ? 'ONLINE' : 'OFFLINE';
+      this.log('info', `📡 NetInfo: ${status}`);
+      
+      if (state.isConnected && !this.isSyncing) {
+        this.log('info', '🌐 Conexão detectada → Iniciar sync automático');
+        this.syncAll().catch(err => {
+          this.log('error', `Sync automático falhou: ${err.message}`);
+        });
+      }
+    });
+  }
+
   async syncAll(): Promise<SyncSummary> {
+    this.log('info', '🔄 syncAll() chamado');
+    
     const networkState = await NetInfo.fetch();
+    this.log('info', `📡 Estado rede: ${networkState.isConnected ? 'ONLINE' : 'OFFLINE'}`);
+    
     if (!networkState.isConnected) {
-      console.log('📵 Sem conexão, sincronização cancelada');
-      return {
-        total: 0,
-        succeeded: 0,
-        failed: 0,
-        results: [],
-      };
+      this.log('warning', '📵 Sem conexão - sync cancelado');
+      return { total: 0, succeeded: 0, failed: 0, results: [] };
     }
 
     if (this.isSyncing) {
-      console.log('⏳ Já está a sincronizar...');
-      return {
-        total: 0,
-        succeeded: 0,
-        failed: 0,
-        results: [],
-      };
+      this.log('warning', '⏳ Já está a sincronizar');
+      return { total: 0, succeeded: 0, failed: 0, results: [] };
     }
 
     this.isSyncing = true;
-    console.log('🔄 Iniciando sincronização...');
+    this.log('info', '▶️ Sincronização INICIADA');
 
     try {
       const pendingReports = await offlineReportsService.getPendingSync();
-      console.log(`📋 ${pendingReports.length} relatórios pendentes`);
+      this.log('info', `📋 ${pendingReports.length} relatórios pendentes`);
 
       if (pendingReports.length === 0) {
         this.isSyncing = false;
-        return {
-          total: 0,
-          succeeded: 0,
-          failed: 0,
-          results: [],
-        };
+        return { total: 0, succeeded: 0, failed: 0, results: [] };
       }
 
       const results: SyncResult[] = [];
 
-      for (const report of pendingReports) {
+      for (let i = 0; i < pendingReports.length; i++) {
+        const report = pendingReports[i];
+        const shortId = report.tempId ? report.tempId.substring(0, 8) : 'N/A';
+        this.log('info', `📝 [${i + 1}/${pendingReports.length}] Processando ${shortId}...`);
+        
         const result = await this.syncOne(report);
         results.push(result);
+        
+        if (result.success) {
+          this.log('success', `✓ ${shortId} sincronizado`);
+        } else {
+          this.log('error', `✗ ${shortId}: ${result.error}`);
+        }
+        
         await this._delay(500);
       }
 
@@ -101,7 +137,7 @@ class ReportSyncService {
         results,
       };
 
-      console.log(`✅ Sincronização concluída: ${summary.succeeded}/${summary.total} sucesso`);
+      this.log('success', `🎉 Sync completo: ${summary.succeeded}/${summary.total} sucesso`);
 
       this._notifyListeners(summary);
       await offlineReportsService.setLastSync();
@@ -110,72 +146,68 @@ class ReportSyncService {
       return summary;
 
     } catch (error: any) {
-      console.error('❌ Erro durante sincronização:', error);
+      this.log('error', `💥 Erro sync: ${error.message}`);
       this.isSyncing = false;
       throw error;
     }
   }
 
   /**
-   * Sincronizar um relatório específico
+   * ✅ NOVA IMPLEMENTAÇÃO: Usar endpoint correto /defect-inspection
    */
   async syncOne(report: OfflineReport): Promise<SyncResult> {
     try {
-      console.log('\n🔄 ========================================');
-      console.log('🔄 Sincronizando relatório:', report.tempId);
-      console.log('🔄 ========================================');
-      
       await offlineReportsService.markSyncing(report.tempId);
 
-      const payload = {
-        tempId: report.tempId,
-        turbineId: report.turbineId,
-        reportType: report.reportType,
-        language: report.language,
-        reportData: JSON.stringify(report.data),
-        photos: report.photos,
-        createdAtDevice: report.createdAt,
-        inspectedBy: report.createdAt,
+      // Parse do reportData
+      const reportData = report.data;
+      
+      this.log('info', `📋 Site: ${reportData.site}`);
+      this.log('info', `📋 WTG: ${reportData.wtgNumber}`);
+      this.log('info', `📋 Fotos: ${report.photos?.length || 0}`);
+
+      // ✅ PASSO 1: Criar relatório usando endpoint correto
+      const createPayload = {
+        site: reportData.site,
+        wtgNumber: reportData.wtgNumber,
+        wtgType: reportData.wtgType,
+        yearConstruction: reportData.yearConstruction,
+        projectoId: report.projectId,
+        turbinaId: report.turbineId,
+        userId: 'mobile-user',
+        photoFileIds: [], // Vazio por enquanto
       };
 
-      console.log('📤 Enviando payload:', {
-        tempId: payload.tempId,
-        turbineId: payload.turbineId,
-        reportType: payload.reportType,
-        language: payload.language,
-        photosCount: payload.photos.length,
-        createdAtDevice: payload.createdAtDevice,
-      });
+      this.log('info', `📤 Criando relatório via /defect-inspection...`);
 
-      const response = await httpClient.post(
-        `${API_CONFIG.baseMobileReportsUrl}sync-offline`,
-        payload
+      const createResponse = await httpClient.post(
+        `${API_CONFIG.baseMobileReportsUrl}defect-inspection`,
+        createPayload
       );
 
-      console.log('📥 Resposta do backend:', JSON.stringify(response.data, null, 2));
+      this.log('info', `📥 Status: ${createResponse.status}`);
+      this.log('info', `📥 Response: ${JSON.stringify(createResponse.data)}`);
 
-      if (!response.data.success) {
-        const errorMsg = response.data.message || 'Erro desconhecido';
-        console.error('❌ Backend retornou erro:', errorMsg);
-        
-        if (response.data.errors && response.data.errors.length > 0) {
-          console.error('❌ Erros de validação:', response.data.errors);
-        }
-        
+      if (!createResponse.data.success) {
+        const errorMsg = createResponse.data.message || 'Erro ao criar relatório';
+        this.log('error', `Backend erro: ${errorMsg}`);
         await offlineReportsService.markSyncError(report.tempId, errorMsg);
         return { success: false, tempId: report.tempId, error: errorMsg };
       }
 
-      const reportUuid = response.data.uuid;
-      console.log('✅ Relatório criado com UUID:', reportUuid);
+      const reportUuid = createResponse.data.uuid;
+      const reportId = createResponse.data.reportId;
       
-      // ========================================
-      // UPLOAD DE FOTOS
-      // ========================================
+      if (!reportUuid) {
+        this.log('error', '❌ Backend não retornou UUID!');
+        throw new Error('UUID não retornado pelo backend');
+      }
+
+      this.log('success', `📋 Relatório criado: UUID=${reportUuid.substring(0, 8)}, ID=${reportId}`);
+      
+      // ✅ PASSO 2: Upload de fotos
       if (report.photos && report.photos.length > 0) {
-        console.log(`\n📸 ========================================`);
-        console.log(`📸 Iniciando upload de ${report.photos.length} fotos...`);
-        console.log(`📸 ========================================\n`);
+        this.log('info', `📸 Uploading ${report.photos.length} fotos...`);
         
         let uploadedCount = 0;
         let failedCount = 0;
@@ -183,77 +215,49 @@ class ReportSyncService {
         for (let i = 0; i < report.photos.length; i++) {
           const photo = report.photos[i];
           
+          if (!photo.uri || photo.uri.trim() === '') {
+            this.log('warning', `⚠️ Foto ${i + 1}: URI vazio`);
+            failedCount++;
+            continue;
+          }
+          
           try {
-            console.log(`\n📷 Foto ${i + 1}/${report.photos.length}:`);
-            console.log(`   - Filename: ${photo.filename}`);
-            console.log(`   - URI: ${photo.uri}`);
-            console.log(`   - MimeType: ${photo.mimeType}`);
-            console.log(`   - TempId: ${photo.tempId}`);
-            
-            // Verificar se o URI existe e é válido
-            if (!photo.uri || photo.uri.trim() === '') {
-              console.warn(`⚠️ Foto ${i + 1} tem URI vazio, a saltar...`);
-              failedCount++;
-              continue;
-            }
-            
-            const fileId = await this._uploadPhoto(photo, reportUuid);
+            await this._uploadPhoto(photo, reportUuid);
             uploadedCount++;
-            console.log(`✅ Foto ${i + 1} enviada com sucesso! FileId: ${fileId}`);
+            this.log('success', `✓ Foto ${i + 1}/${report.photos.length}`);
             
           } catch (photoError: any) {
             failedCount++;
-            console.error(`❌ Erro ao enviar foto ${i + 1}:`, photoError.message);
-            console.error(`   - Stack:`, photoError.stack);
-            
-            // Verificar se é erro de rede ou servidor
-            if (photoError.response) {
-              console.error(`   - Status HTTP: ${photoError.response.status}`);
-              console.error(`   - Resposta:`, JSON.stringify(photoError.response.data, null, 2));
-            }
-            
-            // NÃO parar o processo, continuar com as outras fotos
+            this.log('error', `✗ Foto ${i + 1}: ${photoError.message}`);
           }
         }
         
-        console.log(`\n📸 ========================================`);
-        console.log(`📸 Resultado do upload de fotos:`);
-        console.log(`   ✅ Sucesso: ${uploadedCount}`);
-        console.log(`   ❌ Falhas: ${failedCount}`);
-        console.log(`   📊 Total: ${report.photos.length}`);
-        console.log(`📸 ========================================\n`);
+        this.log('info', `📸 Fotos: ${uploadedCount} sucesso, ${failedCount} falhas`);
         
-        // Mesmo que algumas fotos falharam, considerar sucesso se o relatório foi criado
         if (uploadedCount === 0 && failedCount > 0) {
-          console.warn('⚠️ AVISO: Nenhuma foto foi enviada com sucesso!');
+          this.log('warning', '⚠️ NENHUMA foto foi enviada!');
         }
       } else {
-        console.log('📸 Sem fotos para enviar');
+        this.log('info', '📸 Sem fotos para enviar');
       }
 
-      // Eliminar relatório offline após sucesso
       await offlineReportsService.delete(report.tempId);
-      console.log(`✅ Relatório ${report.tempId} sincronizado e eliminado localmente\n`);
       
-      return { success: true, tempId: report.tempId, reportId: response.data.reportId };
+      return { success: true, tempId: report.tempId, reportId };
       
     } catch (error: any) {
       const errorMsg = error.message || 'Erro desconhecido';
-      console.error(`❌ Erro ao sincronizar ${report.tempId}:`, errorMsg);
-      console.error('Stack trace:', error.stack);
+      this.log('error', `Sync erro: ${errorMsg}`);
       await offlineReportsService.markSyncError(report.tempId, errorMsg);
       return { success: false, tempId: report.tempId, error: errorMsg };
     }
-  }    
+  }
 
-  /**
-   * Tentar novamente relatórios com erro
-   */
   async retryFailed(): Promise<SyncSummary> {
     const reports = await offlineReportsService.getAll();
     const failedReports = reports.filter(r => r.status === 'sync_error');
 
-    console.log(`🔄 Tentando novamente ${failedReports.length} relatórios com erro`);
+    this.log('info', `🔄 Retry: ${failedReports.length} relatórios`);
 
     for (const report of failedReports) {
       await offlineReportsService.markForSync(report.tempId);
@@ -262,66 +266,31 @@ class ReportSyncService {
     return this.syncAll();
   }
 
-  /**
-   * Upload de foto individual com UUID
-   */
   private async _uploadPhoto(photo: OfflinePhoto, reportUuid: string): Promise<number> {
-    try {
-      console.log(`\n   📤 Preparando upload...`);
-      console.log(`   - Endpoint: ${API_CONFIG.baseFilesUrl}upload/${reportUuid}`);
-      
-      const formData = new FormData();
+    const formData = new FormData();
 
-      // CRÍTICO: Verificar formato do objeto de ficheiro
-      const fileObject = {
-        uri: photo.uri,
-        type: photo.mimeType || 'image/jpeg',
-        name: photo.filename,
-      };
-      
-      console.log(`   - File object:`, JSON.stringify(fileObject, null, 2));
-      
-      formData.append('file', fileObject as any);
+    const fileObject = {
+      uri: photo.uri,
+      type: photo.mimeType || 'image/jpeg',
+      name: photo.filename,
+    };
+    
+    formData.append('file', fileObject as any);
 
-      console.log(`   - FormData preparado, a enviar...`);
-
-      const uploadResponse = await httpClient.post(
-        `${API_CONFIG.baseFilesUrl}upload/${reportUuid}`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-          timeout: 30000, // 30 segundos timeout
-        }
-      );
-
-      console.log(`   - Resposta recebida:`, uploadResponse.status);
-      console.log(`   - FileId:`, uploadResponse.data.fileId);
-
-      return uploadResponse.data.fileId;
-      
-    } catch (error: any) {
-      console.error(`   ❌ Erro no upload da foto:`);
-      console.error(`   - Message: ${error.message}`);
-      
-      if (error.response) {
-        console.error(`   - Status: ${error.response.status}`);
-        console.error(`   - Data:`, JSON.stringify(error.response.data, null, 2));
-      } else if (error.request) {
-        console.error(`   - Request foi feito mas sem resposta`);
-        console.error(`   - Request:`, error.request);
-      } else {
-        console.error(`   - Erro ao configurar request:`, error.message);
+    const uploadResponse = await httpClient.post(
+      `${API_CONFIG.baseFilesUrl}upload/${reportUuid}`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 30000,
       }
-      
-      throw error;
-    }
+    );
+
+    return uploadResponse.data.fileId;
   }
 
-  /**
-   * Adicionar listener de sincronização
-   */
   addSyncListener(listener: (summary: SyncSummary) => void): () => void {
     this.syncListeners.push(listener);
 
@@ -333,9 +302,6 @@ class ReportSyncService {
     };
   }
 
-  /**
-   * Notificar listeners
-   */
   private _notifyListeners(summary: SyncSummary): void {
     this.syncListeners.forEach(listener => {
       try {
@@ -346,16 +312,10 @@ class ReportSyncService {
     });
   }
 
-  /**
-   * Verificar se está a sincronizar
-   */
   get isCurrentlySyncing(): boolean {
     return this.isSyncing;
   }
 
-  /**
-   * Delay helper
-   */
   private _delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }

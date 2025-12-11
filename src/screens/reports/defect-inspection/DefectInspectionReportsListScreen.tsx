@@ -40,6 +40,7 @@ import { offlineReportsService, OfflineReport } from '@/services/storage/offline
 import { reportSyncService } from '@/services/sync/reportSync.service';
 import { ReportType } from '@/types/report.types';
 import type { DefectInspectionReportResponse } from '@/types/defectInspectionReport.types';
+import { SyncDebugOverlay } from '@/components/SyncDebugOverlay';
 
 export default function DefectInspectionReportsListScreen() {
   const { turbineId, turbineName, projectName, projectId } = useLocalSearchParams<{
@@ -533,6 +534,9 @@ export default function DefectInspectionReportsListScreen() {
         }}
         label="Novo Relatório"
       />
+      
+      {/* ✅ SYNC DEBUG OVERLAY - ADICIONAR AQUI */}
+      <SyncDebugOverlay />
     </View>
   );
 }
