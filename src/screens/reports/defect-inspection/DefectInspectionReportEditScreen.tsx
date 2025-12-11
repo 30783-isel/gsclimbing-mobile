@@ -332,15 +332,44 @@ export default function DefectInspectionReportEditScreen() {
       if (!currentlyOnline) {
         console.log('📵 SEM REDE → Guardando localmente...');
 
+        // ✅ DEBUG: Logs detalhados das fotos ANTES de guardar
+        console.log('\n🔍 ========================================');
+        console.log('🔍 DEBUG - FOTOS ANTES DE GUARDAR');
+        console.log('🔍 ========================================');
+        console.log(`📊 Total de fotos no array: ${photos.length}`);
+        
+        photos.forEach((photo, index) => {
+          console.log(`\n   Foto ${index + 1}:`);
+          console.log(`      - ID: ${photo.id}`);
+          console.log(`      - URI: ${photo.uri || '(VAZIO)'}`);
+          console.log(`      - URI length: ${photo.uri?.length || 0}`);
+          console.log(`      - Has URI?: ${photo.uri ? 'SIM ✅' : 'NÃO ❌'}`);
+          console.log(`      - Is Uploaded?: ${photo.isUploaded}`);
+          console.log(`      - Page: ${photo.pageNumber}, Position: ${photo.position}`);
+        });
+
         // Preparar fotos offline
         const offlinePhotos: OfflinePhoto[] = photos
-          .filter(p => p.uri)
-          .map((p, i) => ({
-            tempId: `photo-${i}`,
-            uri: p.uri,
-            filename: p.uri.split('/').pop() || `photo-${i}.jpg`,
-            mimeType: 'image/jpeg',
-          }));
+          .filter(p => {
+            const hasUri = p.uri && p.uri.trim() !== '';
+            if (!hasUri) {
+              console.log(`   ⚠️ Foto ${p.id} filtrada (sem URI)`);
+            }
+            return hasUri;
+          })
+          .map((p, i) => {
+            const filename = p.uri.split('/').pop() || `photo-${i}.jpg`;
+            console.log(`   ✅ Incluindo foto ${i}: ${filename}`);
+            return {
+              tempId: `photo-${i}`,
+              uri: p.uri,
+              filename,
+              mimeType: 'image/jpeg',
+            };
+          });
+
+        console.log(`\n📊 Fotos a guardar offline: ${offlinePhotos.length}`);
+        console.log('🔍 ========================================\n');
 
         // Preparar campos adicionais
         const additionalData: Record<string, { label: string; value: string }> = {};
