@@ -1,15 +1,15 @@
 /**
  * DefectInspectionReportsListScreen
- * ✅ COM HISTÓRICO INTEGRADO
+ * ✅ ATUALIZADO PARA USAR O NOVO SISTEMA DE CACHE + HISTÓRICO
  * 
  * Features:
  * - Usa dataCacheService para cache automático
  * - Mostra relatórios online + offline
  * - Banner com botão "Sincronizar Agora"
- * - Menu com opção "Ver Histórico" ✨
  * - FAB para criar novo
  * - Badges de status
  * - Navegação correta (reportId vs tempId)
+ * - Menu com opção "Ver Histórico" ✨ NOVO
  */
 
 import React, { useEffect, useState } from 'react';
@@ -69,6 +69,7 @@ export default function DefectInspectionReportsListScreen() {
       const nowOnline = state.isConnected ?? false;
       setIsOnline(nowOnline);
 
+      // Recarregar quando ficar online
       if (!wasOnline && nowOnline) {
         console.log('🔄 Ficou online - recarregando...');
         loadReports();
@@ -83,6 +84,9 @@ export default function DefectInspectionReportsListScreen() {
     }
   }, [turbineId]);
 
+  /**
+   * ✅ NOVA IMPLEMENTAÇÃO: Carregar relatórios usando cache inteligente
+   */
   const loadReports = async () => {
     if (!turbineId) return;
 
@@ -94,18 +98,23 @@ export default function DefectInspectionReportsListScreen() {
       let onlineReportsData: DefectInspectionReportResponse[] = [];
       let offlineReportsData: OfflineReport[] = [];
 
-      // Carregar relatórios online (com cache)
+      // ========================================
+      // 1. CARREGAR RELATÓRIOS ONLINE (COM CACHE)
+      // ========================================
       if (!isOnline) {
+        // OFFLINE: Carregar do cache direto
         console.log('📵 OFFLINE - carregando do cache...');
         onlineReportsData = await dataCacheService.getReportsFromCache(Number(turbineId));
         setLoadedFromCache(true);
         console.log(`📦 ${onlineReportsData.length} relatórios do cache`);
       } else {
+        // ONLINE: Tentar API, cache como fallback
         console.log('🌐 ONLINE - tentando API...');
         try {
           onlineReportsData = await defectInspectionReportAPI.getByTurbineId(parseInt(turbineId));
           console.log(`✅ ${onlineReportsData.length} relatórios da API`);
           
+          // Guardar no cache para uso offline futuro
           await dataCacheService.cacheReportsData(Number(turbineId), onlineReportsData);
           setLoadedFromCache(false);
         } catch (apiError) {
@@ -116,7 +125,9 @@ export default function DefectInspectionReportsListScreen() {
         }
       }
 
-      // Carregar relatórios offline locais
+      // ========================================
+      // 2. CARREGAR RELATÓRIOS OFFLINE LOCAIS
+      // ========================================
       const allOfflineReports = await offlineReportsService.getAll();
       offlineReportsData = allOfflineReports.filter(
         r => r.turbineId === parseInt(turbineId) && 
@@ -124,7 +135,9 @@ export default function DefectInspectionReportsListScreen() {
       );
       console.log(`📵 ${offlineReportsData.length} relatórios offline locais`);
 
-      // Combinar
+      // ========================================
+      // 3. COMBINAR E MARCAR ORIGEM
+      // ========================================
       const combined = [
         ...onlineReportsData.map(r => ({ ...r, isOffline: false })),
         ...offlineReportsData.map(r => ({
@@ -142,7 +155,7 @@ export default function DefectInspectionReportsListScreen() {
         })),
       ];
 
-      // Ordenar por data (mais recentes primeiro)
+      // 4. Ordenar por data (mais recentes primeiro)
       combined.sort((a, b) => {
         const dateA = new Date(a.createDate).getTime();
         const dateB = new Date(b.createDate).getTime();
@@ -153,9 +166,10 @@ export default function DefectInspectionReportsListScreen() {
       setOfflineReports(offlineReportsData);
       setCombinedReports(combined);
 
-      console.log(`✅ Total: ${combined.length} relatórios`);
+      console.log(`✅ Total: ${combined.length} relatórios (${onlineReportsData.length} online + ${offlineReportsData.length} offline)`);
+
     } catch (error) {
-      console.error('Erro ao carregar relatórios:', error);
+      console.error('❌ Erro ao carregar relatórios:', error);
       Alert.alert('Erro', 'Não foi possível carregar os relatórios');
     } finally {
       setIsLoading(false);
@@ -172,6 +186,7 @@ export default function DefectInspectionReportsListScreen() {
 
   const handleReportPress = (report: any) => {
     if (report.isOffline) {
+      // Relatório offline - editar
       router.push({
         pathname: '/(tabs)/admin/reports/defect-inspection/edit' as any,
         params: {
@@ -181,6 +196,7 @@ export default function DefectInspectionReportsListScreen() {
         },
       });
     } else {
+      // Relatório online - editar
       router.push({
         pathname: '/(tabs)/admin/reports/defect-inspection/edit' as any,
         params: {
@@ -206,6 +222,7 @@ export default function DefectInspectionReportsListScreen() {
 
   const handleDeleteReport = (report: any) => {
     if (report.isOffline) {
+      // Eliminar relatório offline
       Alert.alert(
         'Eliminar Relatório Offline',
         'Este relatório ainda não foi sincronizado.',
@@ -222,6 +239,7 @@ export default function DefectInspectionReportsListScreen() {
         ]
       );
     } else {
+      // Eliminar relatório online
       Alert.alert(
         'Eliminar Relatório',
         'Tem a certeza?',
@@ -248,9 +266,13 @@ export default function DefectInspectionReportsListScreen() {
     }
   };
 
+  /**
+   * Renderizar cada relatório
+   */
   const renderReportItem = (item: any) => {
     const menuId = item.isOffline ? `offline-${item.tempId}` : `online-${item.reportId}`;
 
+    // Badge de status para relatórios offline
     let statusBadge = null;
     if (item.isOffline) {
       const statusConfig = {
@@ -345,6 +367,7 @@ export default function DefectInspectionReportsListScreen() {
             </Menu>
           </View>
 
+          {/* Mostrar erro se houver */}
           {item.isOffline && item.offlineError && (
             <Text variant="bodySmall" style={styles.errorText}>
               ⚠️ {item.offlineError}
@@ -411,7 +434,7 @@ export default function DefectInspectionReportsListScreen() {
         </Banner>
       )}
 
-      {/* Banner Cache */}
+      {/* Banner Cache (quando online mas mostra cache) */}
       {loadedFromCache && isOnline && (
         <Banner
           visible={true}
@@ -481,10 +504,15 @@ export default function DefectInspectionReportsListScreen() {
         label="Novo Relatório"
       />
       
+      {/* ✅ SYNC DEBUG OVERLAY */}
       <SyncDebugOverlay />
     </View>
   );
 }
+
+// ========================================
+// STYLES
+// ========================================
 
 const styles = StyleSheet.create({
   container: {
