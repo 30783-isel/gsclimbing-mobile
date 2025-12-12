@@ -1,11 +1,11 @@
 // src/screens/reports/defect-inspection/DefectInspectionReportHistoryScreen.tsx
 
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl } from 'react-native';
+import { View, StyleSheet, RefreshControl, ScrollView } from 'react-native';
 import { Surface, Text, IconButton, ActivityIndicator, Banner } from 'react-native-paper';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { colors, spacing } from '@/constants/theme';
-import { HistoryTimelineItem } from '@/components/reports/HistoryTimeline.component';
+import { HistoryTimeline } from '@/components/reports/HistoryTimeline.component';
 import { reportHistoryAPI } from '@/services/api/reportHistory.api';
 import type { HistoryEntry } from '@/types/history.types';
 import Toast from 'react-native-toast-message';
@@ -59,47 +59,6 @@ export default function DefectInspectionReportHistoryScreen() {
   useEffect(() => {
     loadHistory();
   }, [reportId]);
-
-  /**
-   * Renderizar item da timeline
-   */
-  const renderHistoryItem = ({ item, index }: { item: HistoryEntry; index: number }) => (
-    <HistoryTimelineItem entry={item} isLast={index === history.length - 1} />
-  );
-
-  /**
-   * Renderizar header vazio (espaçamento)
-   */
-  const renderHeader = () => {
-    if (history.length === 0) return null;
-    
-    return (
-      <View style={styles.listHeader}>
-        <Text variant="bodyMedium" style={styles.headerText}>
-          {history.length} {history.length === 1 ? 'alteração' : 'alterações'} registadas
-        </Text>
-      </View>
-    );
-  };
-
-  /**
-   * Renderizar estado vazio
-   */
-  const renderEmpty = () => {
-    if (isLoading) return null;
-
-    return (
-      <View style={styles.emptyContainer}>
-        <IconButton icon="history" size={64} iconColor={colors.lightGray} />
-        <Text variant="titleMedium" style={styles.emptyTitle}>
-          Sem histórico
-        </Text>
-        <Text variant="bodyMedium" style={styles.emptyText}>
-          Este relatório ainda não tem alterações registadas.
-        </Text>
-      </View>
-    );
-  };
 
   if (isLoading && !isRefreshing) {
     return (
@@ -178,14 +137,9 @@ export default function DefectInspectionReportHistoryScreen() {
         </Banner>
       )}
 
-      {/* Lista de histórico */}
-      <FlatList
-        data={history}
-        renderItem={renderHistoryItem}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.listContent}
-        ListHeaderComponent={renderHeader}
-        ListEmptyComponent={renderEmpty}
+      {/* Timeline de histórico */}
+      <ScrollView
+        style={styles.scrollView}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -193,7 +147,19 @@ export default function DefectInspectionReportHistoryScreen() {
             colors={[colors.primary]}
           />
         }
-      />
+      >
+        {/* Contador de alterações */}
+        {history.length > 0 && (
+          <View style={styles.counterContainer}>
+            <Text variant="bodyMedium" style={styles.counterText}>
+              {history.length} {history.length === 1 ? 'alteração' : 'alterações'} registadas
+            </Text>
+          </View>
+        )}
+
+        {/* ✅ COMPONENTE COMPLETO DE TIMELINE */}
+        <HistoryTimeline history={history} />
+      </ScrollView>
     </View>
   );
 }
@@ -231,31 +197,17 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     color: colors.textSecondary,
   },
-  listContent: {
+  scrollView: {
+    flex: 1,
+  },
+  counterContainer: {
     padding: spacing.md,
-  },
-  listHeader: {
-    marginBottom: spacing.md,
-    padding: spacing.sm,
     backgroundColor: colors.surface,
-    borderRadius: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lightGray,
   },
-  headerText: {
+  counterText: {
     color: colors.textSecondary,
     textAlign: 'center',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xl * 2,
-  },
-  emptyTitle: {
-    color: colors.text,
-    marginTop: spacing.md,
-  },
-  emptyText: {
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: spacing.xs,
   },
 });

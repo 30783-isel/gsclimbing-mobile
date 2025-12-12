@@ -1,213 +1,302 @@
-// src/components/reports/HistoryTimeline.component.tsx
+// src/components/history/HistoryTimeline.component.tsx
 
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Card, Text, Chip, IconButton } from 'react-native-paper';
-import { colors, spacing } from '@/constants/theme';
-import type { HistoryEntry } from '@/types/history.types';
+import { View, StyleSheet, ScrollView } from 'react-native';
+import { Text, Chip, useTheme, Icon, Card } from 'react-native-paper';
+import { format, parseISO } from 'date-fns';
+import { pt } from 'date-fns/locale';
+import type { HistoryEntry, HistoryAction } from '@/types/history.types';
 import { getActionConfig, translateFieldName } from '@/types/history.types';
-import { formatDistanceToNow } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 interface HistoryTimelineProps {
-  entry: HistoryEntry;
-  isLast: boolean;
+  history: HistoryEntry[];
 }
 
 /**
- * Componente individual da timeline de histórico
- * Mostra uma entrada de histórico com ícone, ação e diff
+ * Componente de Timeline de Histórico com suporte visual para fotos
  */
-export const HistoryTimelineItem: React.FC<HistoryTimelineProps> = ({ entry, isLast }) => {
-  const config = getActionConfig(entry.action);
+export const HistoryTimeline: React.FC<HistoryTimelineProps> = ({ history }) => {
+  const theme = useTheme();
+  const colors = theme.colors;
 
-  // Formatar data relativa (ex: "há 2 horas")
-  const timeAgo = React.useMemo(() => {
+  /**
+   * Formata a data de forma relativa
+   */
+  const formatDate = (dateString: string): string => {
     try {
-      return formatDistanceToNow(new Date(entry.changedAt), {
-        addSuffix: true,
-        locale: ptBR,
-      });
-    } catch {
-      return new Date(entry.changedAt).toLocaleString('pt-PT');
+      const date = parseISO(dateString);
+      return format(date, "d 'de' MMMM 'às' HH:mm", { locale: pt });
+    } catch (error) {
+      return dateString;
     }
-  }, [entry.changedAt]);
+  };
 
-  // Determinar se é uma alteração de campo (mostra diff)
-  const isFieldUpdate = entry.action === 'UPDATE' && entry.fieldName;
+  /**
+   * Renderiza uma entrada de histórico
+   */
+  const renderHistoryEntry = (entry: HistoryEntry, index: number) => {
+    const config = getActionConfig(entry.action as HistoryAction);
+    const isLast = index === history.length - 1;
 
-  return (
-    <View style={styles.timelineItem}>
-      {/* Linha vertical da timeline */}
-      {!isLast && <View style={styles.timelineLine} />}
+    return (
+      <View key={entry.id} style={styles.entryContainer}>
+        {/* Linha vertical da timeline */}
+        {!isLast && <View style={[styles.timelineLine, { backgroundColor: colors.outlineVariant }]} />}
 
-      {/* Ícone da ação */}
-      <View style={[styles.timelineIcon, { backgroundColor: config.color }]}>
-        <IconButton
-          icon={config.icon}
-          size={20}
-          iconColor={colors.white}
-          style={styles.icon}
-        />
-      </View>
+        {/* Ícone da ação */}
+        <View style={[styles.iconContainer, { backgroundColor: config.color }]}>
+          <Icon source={config.icon} size={20} color="#FFFFFF" />
+        </View>
 
-      {/* Card com detalhes */}
-      <Card style={styles.card} mode="elevated">
-        <Card.Content>
-          {/* Header: Ação + Tempo */}
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <Text variant="titleSmall" style={{ color: config.color }}>
+        {/* Card com detalhes */}
+        <Card style={styles.card} mode="elevated">
+          <Card.Content>
+            {/* Cabeçalho: Ação + Data */}
+            <View style={styles.header}>
+              <Text variant="titleMedium" style={[styles.actionLabel, { color: config.color }]}>
                 {config.label}
               </Text>
-              <Chip icon="account" compact style={styles.userChip}>
-                {entry.changedBy}
-              </Chip>
-            </View>
-            <Text variant="bodySmall" style={styles.timeText}>
-              {timeAgo}
-            </Text>
-          </View>
-
-          {/* Descrição (se houver) */}
-          {entry.description && (
-            <Text variant="bodyMedium" style={styles.description}>
-              {entry.description}
-            </Text>
-          )}
-
-          {/* Diff (se for UPDATE de campo) */}
-          {isFieldUpdate && (
-            <View style={styles.diffContainer}>
-              <Text variant="labelSmall" style={styles.fieldLabel}>
-                {translateFieldName(entry.fieldName!)}:
+              <Text variant="bodySmall" style={styles.date}>
+                {formatDate(entry.changedAt)}
               </Text>
-
-              {/* Valor antigo */}
-              <View style={styles.diffRow}>
-                <IconButton
-                  icon="minus-circle"
-                  size={16}
-                  iconColor={colors.error}
-                />
-                <View style={styles.valueBox}>
-                  <Text variant="bodySmall" style={styles.oldValueText}>
-                    {entry.oldValue || '(vazio)'}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Seta indicando mudança */}
-              <View style={styles.arrowContainer}>
-                <IconButton icon="arrow-down" size={16} iconColor={colors.textSecondary} />
-              </View>
-
-              {/* Valor novo */}
-              <View style={styles.diffRow}>
-                <IconButton
-                  icon="plus-circle"
-                  size={16}
-                  iconColor={colors.success}
-                />
-                <View style={[styles.valueBox, { backgroundColor: colors.success + '10' }]}>
-                  <Text variant="bodySmall" style={styles.newValueText}>
-                    {entry.newValue || '(vazio)'}
-                  </Text>
-                </View>
-              </View>
             </View>
-          )}
-        </Card.Content>
-      </Card>
-    </View>
+
+            {/* Utilizador */}
+            <Chip
+              mode="outlined"
+              compact
+              style={styles.userChip}
+              textStyle={styles.userChipText}
+              icon="account"
+            >
+              {entry.changedBy}
+            </Chip>
+
+            {/* Descrição (se houver) */}
+            {entry.description && (
+              <Text variant="bodyMedium" style={styles.description}>
+                {entry.description}
+              </Text>
+            )}
+
+            {/* Detalhes da alteração de campo */}
+            {entry.fieldName && (
+              <View style={styles.fieldChangeContainer}>
+                <Text variant="labelMedium" style={styles.fieldLabel}>
+                  📝 {translateFieldName(entry.fieldName)}
+                </Text>
+
+                {/* Caso especial: Fotos */}
+                {(entry.fieldName === 'photo_added' || entry.fieldName === 'photo_removed') ? (
+                  <View style={styles.photoChange}>
+                    {entry.fieldName === 'photo_added' && (
+                      <View style={[styles.photoBox, styles.photoAdded]}>
+                        <Icon source="image-plus" size={24} color={colors.primary} />
+                        <Text variant="bodyMedium" style={[styles.photoText, { color: colors.primary }]}>
+                          {entry.newValue || 'Foto adicionada'}
+                        </Text>
+                      </View>
+                    )}
+                    {entry.fieldName === 'photo_removed' && (
+                      <View style={[styles.photoBox, styles.photoRemoved]}>
+                        <Icon source="image-minus" size={24} color={colors.error} />
+                        <Text variant="bodyMedium" style={[styles.photoText, { color: colors.error }]}>
+                          {entry.oldValue || 'Foto removida'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                ) : (
+                  /* Caso normal: Alteração de campo de texto */
+                  <View style={styles.valueChangeContainer}>
+                    {entry.oldValue && (
+                      <View style={[styles.valueBox, styles.oldValue]}>
+                        <Text variant="bodySmall" style={styles.valueLabel}>
+                          Anterior:
+                        </Text>
+                        <Text variant="bodyMedium" style={[styles.value, styles.oldValueText]}>
+                          {entry.oldValue}
+                        </Text>
+                      </View>
+                    )}
+
+                    {entry.oldValue && entry.newValue && (
+                      <Icon source="arrow-right" size={20} color={colors.onSurfaceVariant} />
+                    )}
+
+                    {entry.newValue && (
+                      <View style={[styles.valueBox, styles.newValue]}>
+                        <Text variant="bodySmall" style={styles.valueLabel}>
+                          Novo:
+                        </Text>
+                        <Text variant="bodyMedium" style={[styles.value, styles.newValueText]}>
+                          {entry.newValue}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
+            )}
+          </Card.Content>
+        </Card>
+      </View>
+    );
+  };
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {history.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Icon source="history" size={48} color={colors.onSurfaceDisabled} />
+          <Text variant="bodyLarge" style={{ color: colors.onSurfaceDisabled, marginTop: 16 }}>
+            Sem histórico de alterações
+          </Text>
+        </View>
+      ) : (
+        history.map((entry, index) => renderHistoryEntry(entry, index))
+      )}
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  timelineItem: {
+  container: {
+    flex: 1,
+  },
+  content: {
+    padding: 16,
+  },
+  entryContainer: {
     flexDirection: 'row',
-    marginBottom: spacing.md,
+    marginBottom: 24,
     position: 'relative',
   },
   timelineLine: {
     position: 'absolute',
-    left: 18,
-    top: 50,
-    bottom: -spacing.md,
+    left: 15,
+    top: 32,
+    bottom: -24,
     width: 2,
-    backgroundColor: colors.lightGray,
   },
-  timelineIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  iconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.sm,
+    marginRight: 12,
     elevation: 2,
-  },
-  icon: {
-    margin: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
   },
   card: {
     flex: 1,
-    marginTop: 2,
+    elevation: 1,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.xs,
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  headerLeft: {
-    flex: 1,
-    gap: spacing.xs,
+  actionLabel: {
+    fontWeight: '600',
+  },
+  date: {
+    opacity: 0.6,
   },
   userChip: {
     alignSelf: 'flex-start',
+    marginBottom: 8,
+    height: 28,
   },
-  timeText: {
-    color: colors.textSecondary,
-    marginLeft: spacing.xs,
+  userChipText: {
+    fontSize: 12,
   },
   description: {
-    color: colors.text,
-    marginTop: spacing.xs,
+    marginTop: 8,
+    fontStyle: 'italic',
+    opacity: 0.8,
   },
-  diffContainer: {
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.lightGray,
+  fieldChangeContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
   },
   fieldLabel: {
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: spacing.xs,
+    marginBottom: 8,
+    fontWeight: '600',
   },
-  diffRow: {
+  
+  // ✅ ESTILOS PARA FOTOS
+  photoChange: {
+    marginTop: 4,
+  },
+  photoBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 2,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 2,
+    gap: 8,
+  },
+  photoAdded: {
+    backgroundColor: '#E8F5E9',
+    borderColor: '#4CAF50',
+  },
+  photoRemoved: {
+    backgroundColor: '#FFEBEE',
+    borderColor: '#F44336',
+  },
+  photoText: {
+    flex: 1,
+    fontWeight: '500',
+  },
+  
+  // Estilos para alterações de texto
+  valueChangeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
   },
   valueBox: {
     flex: 1,
-    backgroundColor: colors.surface,
-    padding: spacing.sm,
-    borderRadius: 4,
+    minWidth: 120,
+    padding: 8,
+    borderRadius: 6,
     borderWidth: 1,
-    borderColor: colors.lightGray,
+  },
+  oldValue: {
+    backgroundColor: '#FFEBEE',
+    borderColor: '#EF5350',
+  },
+  newValue: {
+    backgroundColor: '#E8F5E9',
+    borderColor: '#66BB6A',
+  },
+  valueLabel: {
+    opacity: 0.7,
+    marginBottom: 4,
+  },
+  value: {
+    fontWeight: '500',
   },
   oldValueText: {
-    color: colors.error,
+    color: '#C62828',
     textDecorationLine: 'line-through',
   },
   newValueText: {
-    color: colors.success,
-    fontWeight: '500',
+    color: '#2E7D32',
   },
-  arrowContainer: {
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginVertical: -spacing.xs,
+    paddingVertical: 48,
   },
 });
