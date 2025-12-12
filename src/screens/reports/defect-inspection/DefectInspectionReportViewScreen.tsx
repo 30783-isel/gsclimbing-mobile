@@ -1,16 +1,3 @@
-/**
- * DefectInspectionReportViewScreen
- * ✅ COM HISTÓRICO INTEGRADO
- * 
- * Features:
- * - Visualização completa do relatório
- * - Botão de histórico no header ✨
- * - Card de histórico rápido ✨
- * - Galeria de fotos
- * - Estatísticas
- * - Navegação para edição
- */
-
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -25,25 +12,22 @@ import {
   Chip,
   Surface,
   Divider,
-  Button,
 } from 'react-native-paper';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { colors, spacing } from '@/constants/theme';
 import { defectInspectionReportAPI } from '@/services/api/defectInspectionReport.api';
 import { reportPhotosAPI, type ReportPhotoData } from '@/services/api/reportPhotos.api';
-import type { DefectInspectionReportResponse } from '@/types/defectInspectionReport.types';
+import type { DefectInspectionReportResponse } from '@/reports/defectInspectionReport/defectInspectionReport.types';
 import { PhotoGallery } from '@/components/PhotoGallery';
 import Toast from 'react-native-toast-message';
-import { useAuthStore } from '@/store/authStore';
 
 export default function DefectInspectionReportViewScreen() {
   const router = useRouter();
   const { reportId, turbineName, projectName } = useLocalSearchParams<{
     reportId: string;
-    turbineName?: string;
-    projectName?: string;
+    turbineName: string;
+    projectName: string;
   }>();
-  const { role: userRole } = useAuthStore();
 
   const [report, setReport] = useState<DefectInspectionReportResponse | null>(null);
   const [photos, setPhotos] = useState<ReportPhotoData[]>([]);
@@ -101,118 +85,86 @@ export default function DefectInspectionReportViewScreen() {
     }
   };
 
+  const handleBack = () => {
+    router.back();
+  };
+
+  // ✅ NOVA FUNÇÃO: Navegar para edição
+  const handleEdit = () => {
+    router.push({
+      pathname: '/(tabs)/admin/reports/defect-inspection/edit' as any,
+      params: {
+        reportId: reportId.toString(),
+      },
+    });
+  };
+
   const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('pt-PT', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return dateString;
-    }
+    const date = new Date(dateString);
+    return date.toLocaleString('pt-PT', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
-        {/* Header */}
-        <Surface style={styles.header} elevation={2}>
-          <IconButton
-            icon="arrow-left"
-            size={24}
-            iconColor={colors.white}
-            onPress={() => router.back()}
-          />
-          <View style={styles.headerCenter}>
-            <Text variant="titleLarge" style={styles.headerTitle}>
-              Relatório #{reportId}
-            </Text>
-          </View>
-          <View style={{ width: 48 }} />
-        </Surface>
-
-        {/* Loading */}
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>A carregar relatório...</Text>
-        </View>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>A carregar relatório...</Text>
       </View>
     );
   }
 
   if (!report) {
     return (
-      <View style={styles.container}>
-        <Surface style={styles.header} elevation={2}>
-          <IconButton
-            icon="arrow-left"
-            size={24}
-            iconColor={colors.white}
-            onPress={() => router.back()}
-          />
-          <View style={styles.headerCenter}>
-            <Text variant="titleLarge" style={styles.headerTitle}>
-              Erro
-            </Text>
-          </View>
-          <View style={{ width: 48 }} />
-        </Surface>
-
-        <View style={styles.errorContainer}>
-          <IconButton icon="alert-circle" size={64} iconColor={colors.error} />
-          <Text variant="titleMedium" style={styles.errorTitle}>
-            Relatório não encontrado
-          </Text>
-          <Button mode="contained" onPress={() => router.back()} style={styles.backButton}>
-            Voltar
-          </Button>
-        </View>
+      <View style={styles.errorContainer}>
+        <IconButton
+          icon="alert-circle-outline"
+          size={64}
+          iconColor={colors.error}
+        />
+        <Text variant="titleMedium" style={styles.errorTitle}>
+          Relatório não encontrado
+        </Text>
+        <Text variant="bodyMedium" style={styles.errorText}>
+          Não foi possível carregar os detalhes do relatório.
+        </Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header com Botão de Editar */}
       <Surface style={styles.header} elevation={2}>
         <IconButton
           icon="arrow-left"
           size={24}
           iconColor={colors.white}
-          onPress={() => router.back()}
+          onPress={handleBack}
         />
         <View style={styles.headerCenter}>
           <Text variant="titleLarge" style={styles.headerTitle}>
-            Relatório #{reportId}
+            Relatório #{report.reportId}
           </Text>
           <Text variant="bodySmall" style={styles.headerSubtitle}>
-            {report.site} - {report.wtgNumber}
+            {turbineName} - {projectName}
           </Text>
         </View>
-        
-        {/* ✅ NOVO: Botão de Histórico */}
+        {/* ✅ BOTÃO DE EDITAR */}
         <IconButton
-          icon="history"
+          icon="pencil"
           size={24}
           iconColor={colors.white}
-          onPress={() => {
-            router.push({
-              pathname: `/(tabs)/${userRole.toLowerCase()}/reports/defect-inspection/${reportId}/history` as any,
-              params: {
-                reportId: reportId.toString(),
-                reportTitle: `#${reportId} - ${report.wtgNumber}`,
-              },
-            });
-          }}
+          onPress={handleEdit}
         />
       </Surface>
 
-      {/* Content */}
-      <ScrollView style={styles.scrollView}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Informações Gerais */}
         <Card style={styles.card} mode="elevated">
           <Card.Title
@@ -220,7 +172,7 @@ export default function DefectInspectionReportViewScreen() {
             left={(props) => (
               <IconButton
                 {...props}
-                icon="information"
+                icon="information-outline"
                 iconColor={colors.primary}
               />
             )}
@@ -284,56 +236,6 @@ export default function DefectInspectionReportViewScreen() {
           </Card.Content>
         </Card>
 
-        {/* ✅ NOVO: Card de Histórico Rápido */}
-        <Card style={styles.card} mode="elevated">
-          <Card.Title
-            title="Histórico de Alterações"
-            left={(props) => (
-              <IconButton
-                {...props}
-                icon="history"
-                iconColor={colors.primary}
-              />
-            )}
-            right={(props) => (
-              <IconButton
-                {...props}
-                icon="arrow-right"
-                onPress={() => {
-                  router.push({
-                    pathname: `/(tabs)/${userRole.toLowerCase()}/reports/defect-inspection/${reportId}/history` as any,
-                    params: {
-                      reportId: reportId.toString(),
-                      reportTitle: `#${reportId} - ${report.wtgNumber}`,
-                    },
-                  });
-                }}
-              />
-            )}
-          />
-          <Card.Content>
-            <Text variant="bodyMedium" style={styles.historyText}>
-              Ver todas as alterações efetuadas neste relatório
-            </Text>
-            <Button
-              mode="outlined"
-              icon="history"
-              onPress={() => {
-                router.push({
-                  pathname: `/(tabs)/${userRole.toLowerCase()}/reports/defect-inspection/${reportId}/history` as any,
-                  params: {
-                    reportId: reportId.toString(),
-                    reportTitle: `#${reportId} - ${report.wtgNumber}`,
-                  },
-                });
-              }}
-              style={styles.historyButton}
-            >
-              Ver Histórico Completo
-            </Button>
-          </Card.Content>
-        </Card>
-
         {/* Estatísticas */}
         <Card style={styles.card} mode="elevated">
           <Card.Title
@@ -354,7 +256,25 @@ export default function DefectInspectionReportViewScreen() {
                   mode="outlined"
                   style={styles.statChip}
                 >
-                  {report.numberPictures} {report.numberPictures === 1 ? 'foto' : 'fotos'}
+                  {report.numberPictures} {report.numberPictures === 1 ? 'Foto' : 'Fotos'}
+                </Chip>
+              </View>
+              <View style={styles.statItem}>
+                <Chip 
+                  icon="turbine" 
+                  mode="outlined"
+                  style={styles.statChip}
+                >
+                  Turbina #{report.turbinaId}
+                </Chip>
+              </View>
+              <View style={styles.statItem}>
+                <Chip 
+                  icon="folder" 
+                  mode="outlined"
+                  style={styles.statChip}
+                >
+                  Projeto #{report.projectoId}
                 </Chip>
               </View>
             </View>
@@ -362,54 +282,53 @@ export default function DefectInspectionReportViewScreen() {
         </Card>
 
         {/* Fotografias */}
-        {photos.length > 0 && (
+        {isLoadingPhotos ? (
+          <Card style={styles.card} mode="elevated">
+            <Card.Content>
+              <View style={styles.loadingPhotosContainer}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.loadingPhotosText}>
+                  A carregar fotografias...
+                </Text>
+              </View>
+            </Card.Content>
+          </Card>
+        ) : photos.length > 0 ? (
           <Card style={styles.card} mode="elevated">
             <Card.Title
               title="Fotografias"
+              subtitle={`${photos.length} ${photos.length === 1 ? 'fotografia' : 'fotografias'}`}
               left={(props) => (
                 <IconButton
                   {...props}
-                  icon="camera"
+                  icon="image-multiple-outline"
                   iconColor={colors.primary}
                 />
               )}
             />
             <Card.Content>
-              {isLoadingPhotos ? (
-                <View style={styles.photosLoadingContainer}>
-                  <ActivityIndicator size="small" color={colors.primary} />
-                  <Text style={styles.photosLoadingText}>
-                    A carregar fotografias...
-                  </Text>
-                </View>
-              ) : (
-                <PhotoGallery photos={photos} />
-              )}
+              <PhotoGallery photos={photos} />
             </Card.Content>
           </Card>
-        )}
+        ) : report.numberPictures > 0 ? (
+          <Card style={styles.card} mode="elevated">
+            <Card.Content>
+              <View style={styles.noPhotosContainer}>
+                <IconButton
+                  icon="alert-circle-outline"
+                  size={48}
+                  iconColor={colors.warning}
+                />
+                <Text variant="bodyMedium" style={styles.noPhotosText}>
+                  Erro ao carregar fotografias
+                </Text>
+              </View>
+            </Card.Content>
+          </Card>
+        ) : null}
 
-        {/* Botão de Editar */}
-        <View style={styles.actionButtonsContainer}>
-          <Button
-            mode="contained"
-            icon="pencil"
-            onPress={() => {
-              router.push({
-                pathname: '/(tabs)/admin/reports/defect-inspection/edit' as any,
-                params: {
-                  reportId: reportId.toString(),
-                },
-              });
-            }}
-            style={styles.editButton}
-          >
-            Editar Relatório
-          </Button>
-        </View>
-
-        {/* Espaçamento no final */}
-        <View style={{ height: spacing.xl }} />
+        {/* Espaço no final */}
+        <View style={styles.bottomSpacer} />
       </ScrollView>
     </View>
   );
@@ -455,19 +374,21 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   errorTitle: {
+    marginTop: spacing.md,
     color: colors.error,
-    marginTop: spacing.md,
-    marginBottom: spacing.lg,
+    fontWeight: 'bold',
   },
-  backButton: {
-    marginTop: spacing.md,
+  errorText: {
+    marginTop: spacing.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
-  scrollView: {
-    flex: 1,
+  scrollContent: {
+    padding: spacing.md,
   },
   card: {
-    margin: spacing.md,
-    marginBottom: 0,
+    marginBottom: spacing.md,
+    backgroundColor: colors.white,
   },
   infoRow: {
     flexDirection: 'row',
@@ -476,7 +397,7 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontWeight: 'bold',
-    color: colors.textSecondary,
+    color: colors.text,
     flex: 1,
   },
   infoValue: {
@@ -485,7 +406,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   infoValueSmall: {
-    color: colors.text,
+    color: colors.textSecondary,
     flex: 2,
     textAlign: 'right',
     fontSize: 11,
@@ -493,39 +414,36 @@ const styles = StyleSheet.create({
   divider: {
     marginVertical: spacing.md,
   },
-  historyText: {
-    color: colors.textSecondary,
-    marginBottom: spacing.md,
-  },
-  historyButton: {
-    marginTop: spacing.xs,
-  },
   statsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
   statItem: {
-    marginRight: spacing.sm,
-    marginBottom: spacing.sm,
+    minWidth: '30%',
   },
   statChip: {
-    backgroundColor: colors.surface,
+    marginBottom: spacing.xs,
   },
-  photosLoadingContainer: {
+  loadingPhotosContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.lg,
+    paddingVertical: spacing.lg,
   },
-  photosLoadingText: {
-    marginLeft: spacing.sm,
+  loadingPhotosText: {
+    marginLeft: spacing.md,
     color: colors.textSecondary,
   },
-  actionButtonsContainer: {
-    margin: spacing.md,
+  noPhotosContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
   },
-  editButton: {
-    marginTop: spacing.md,
+  noPhotosText: {
+    marginTop: spacing.sm,
+    color: colors.textSecondary,
+  },
+  bottomSpacer: {
+    height: spacing.xl,
   },
 });
