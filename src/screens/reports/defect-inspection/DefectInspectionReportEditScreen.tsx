@@ -360,9 +360,10 @@ const handleSave = async () => {
     console.log('🌐 ONLINE → Enviando para API...');
 
     // ✅ CORREÇÃO: Separar fotos novas das existentes
-    const photosToUpload = photos.filter(p => p.uri && !p.isUploaded);
+    const photosToUpload = photos.filter(p => p.uri && p.uri.trim() !== '' && !p.isUploaded);
+    // ✅ CORREÇÃO: Apenas incluir fileIds de fotos que TÊM URI
     const existingPhotoIds: number[] = photos
-      .filter(p => p.fileId)
+      .filter(p => p.fileId && p.uri && p.uri.trim() !== '')  // ✅ Verificar se tem URI!
       .map(p => Number(p.fileId));
 
     console.log(`📸 Fotos existentes: ${existingPhotoIds.length}`);
@@ -612,32 +613,34 @@ const handleSave = async () => {
     }
   };
 
-  const handleRemovePhoto = () => {
-    if (selectedPhotoIndex === null) return;
+const handleRemovePhoto = () => {
+  if (selectedPhotoIndex === null) return;
 
-    Alert.alert(
-      'Remover Foto',
-      'Tem a certeza?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Remover',
-          style: 'destructive',
-          onPress: () => {
-            const newPhotos = [...photos];
-            newPhotos[selectedPhotoIndex] = {
-              ...newPhotos[selectedPhotoIndex],
-              uri: '',
-              fileId: undefined,
-              isUploaded: false,
-            };
-            setPhotos(newPhotos);
-            setPhotoDialogVisible(false);
-          },
+  Alert.alert(
+    'Remover Foto',
+    'Tem a certeza?',
+    [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Remover',
+        style: 'destructive',
+        onPress: () => {
+          const newPhotos = [...photos];
+          // ✅ CORREÇÃO: Limpar TODOS os campos
+          newPhotos[selectedPhotoIndex] = {
+            ...newPhotos[selectedPhotoIndex],
+            uri: '',              // ✅ Limpar URI
+            fileId: undefined,    // ✅ IMPORTANTE: Remover fileId!
+            isUploaded: false,    // ✅ Marcar como não carregada
+            description: '',      // ✅ Limpar descrição
+          };
+          setPhotos(newPhotos);
+          setPhotoDialogVisible(false);
         },
-      ]
-    );
-  };
+      },
+    ]
+  );
+};
 
   // Campos adicionais
   const handleSaveField = () => {
