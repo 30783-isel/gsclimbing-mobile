@@ -307,258 +307,280 @@ export default function DefectInspectionReportEditScreen() {
     return true;
   };
 
-/**
- * CORREÇÃO DO BUG DE HISTÓRICO DE FOTOS
- * 
- * PROBLEMA IDENTIFICADO NOS LOGS:
- * 
- * No DefectInspectionReportEditScreen.tsx, a função handleSave() está a fazer:
- * 
- * 1. Upload das fotos ANTES do update (linha ~580-610)
- * 2. Chamar defectInspectionReportAPI.update() DEPOIS
- * 
- * Isto faz com que as fotos já estejam associadas ao relatório quando o update é chamado!
- * 
- * Exemplo dos logs:
- * 22:28:38.071 - Upload foto 18537
- * 22:28:38.140 - Update chamado
- * 22:28:38.151 - ANTIGAS: [18536, 18537] ← A foto 18537 já está aqui!
- * 
- * SOLUÇÃO: 
- * Mudar a ordem:
- * 1. Chamar update() PRIMEIRO (sem as fotos novas)
- * 2. Fazer upload das fotos DEPOIS
- * 3. Chamar update() NOVAMENTE com os novos IDs
- */
+  /**
+   * CORREÇÃO DO BUG DE HISTÓRICO DE FOTOS
+   * 
+   * PROBLEMA IDENTIFICADO NOS LOGS:
+   * 
+   * No DefectInspectionReportEditScreen.tsx, a função handleSave() está a fazer:
+   * 
+   * 1. Upload das fotos ANTES do update (linha ~580-610)
+   * 2. Chamar defectInspectionReportAPI.update() DEPOIS
+   * 
+   * Isto faz com que as fotos já estejam associadas ao relatório quando o update é chamado!
+   * 
+   * Exemplo dos logs:
+   * 22:28:38.071 - Upload foto 18537
+   * 22:28:38.140 - Update chamado
+   * 22:28:38.151 - ANTIGAS: [18536, 18537] ← A foto 18537 já está aqui!
+   * 
+   * SOLUÇÃO: 
+   * Mudar a ordem:
+   * 1. Chamar update() PRIMEIRO (sem as fotos novas)
+   * 2. Fazer upload das fotos DEPOIS
+   * 3. Chamar update() NOVAMENTE com os novos IDs
+   */
 
-// ===== LOCALIZAR ESTA FUNÇÃO NO DefectInspectionReportEditScreen.tsx =====
+  // ===== LOCALIZAR ESTA FUNÇÃO NO DefectInspectionReportEditScreen.tsx =====
 
-const handleSave = async () => {
-  if (!site.trim() || !wtgNumber.trim()) {
-    Alert.alert('Erro', 'Preencha Site e WTG Number');
-    return;
-  }
-
-  setSaving(true);
-  setUploadProgress(0);
-
-  try {
-    const isOnline = await NetInfo.fetch().then((state) => state.isConnected);
-
-    // ========================================
-    // OPÇÃO A: ESTÁ OFFLINE
-    // ========================================
-    if (!isOnline) {
-      // [Manter código offline existente - não alterar]
-      // ...
+  const handleSave = async () => {
+    if (!site.trim() || !wtgNumber.trim()) {
+      Alert.alert('Erro', 'Preencha Site e WTG Number');
       return;
     }
 
-    // ========================================
-    // OPÇÃO B: ESTÁ ONLINE → ENVIAR PARA API
-    // ========================================
-    console.log('🌐 ONLINE → Enviando para API...');
-
-    // ✅ CORREÇÃO: Separar fotos novas das existentes
-    const photosToUpload = photos.filter(p => p.uri && p.uri.trim() !== '' && !p.isUploaded);
-    // ✅ CORREÇÃO: Apenas incluir fileIds de fotos que TÊM URI
-    const existingPhotoIds: number[] = photos
-      .filter(p => p.fileId && p.uri && p.uri.trim() !== '')  // ✅ Verificar se tem URI!
-      .map(p => Number(p.fileId));
-
-    console.log(`📸 Fotos existentes: ${existingPhotoIds.length}`);
-    console.log(`📸 Fotos a enviar: ${photosToUpload.length}`);
-
-    // Preparar campos adicionais
-    const additionalData: Record<string, { label: string; value: string }> = {};
-    additionalFields.forEach((field, index) => {
-      if (field.label && field.value) {
-        additionalData[`additionalField${index + 1}`] = {
-          label: field.label,
-          value: field.value,
-        };
-      }
-    });
-
-    if (reportId === 0) {
-      // ========================================
-      // CRIAR NOVO RELATÓRIO
-      // ========================================
-      console.log('📝 Criando relatório via API...');
-
-      // B.1: Criar relatório SEM fotos
-      const reportData: any = {
-        site,
-        wtgNumber,
-        wtgType,
-        yearConstruction,
-        projectoId: projectId || 0,
-        turbinaId: turbineId || 0,
-        photoFileIds: [], // ✅ Criar SEM fotos primeiro
-        language: 'EN',
-        ...additionalData,
-      };
-
-      const createdReport = await defectInspectionReportAPI.create(reportData);
-      console.log('✅ Relatório criado:', createdReport.reportId);
-
-      // B.2: Se há fotos, fazer upload DEPOIS
-      if (photosToUpload.length > 0) {
-        console.log(`📸 Fazendo upload de ${photosToUpload.length} fotos...`);
-
-        const uploadedPhotoIds: number[] = [];
-
-        for (let i = 0; i < photosToUpload.length; i++) {
-          const photo = photosToUpload[i];
-
-          const formData = new FormData();
-          formData.append('file', {
-            uri: photo.uri,
-            type: 'image/jpeg',
-            name: photo.uri.split('/').pop() || `photo-${i}.jpg`,
-          } as any);
-
-          const uploadResponse = await httpClient.post(
-            `${API_CONFIG.baseFilesUrl}upload/${createdReport.uuid}`,
-            formData,
-            {
-              headers: { 'Content-Type': 'multipart/form-data' },
-              onUploadProgress: (progressEvent) => {
-                const progress = (i + (progressEvent.loaded / (progressEvent.total || 1))) / photosToUpload.length;
-                setUploadProgress(progress);
-              },
-            }
-          );
-
-          uploadedPhotoIds.push(uploadResponse.data.fileId);
-          console.log(`✅ Foto ${i + 1} uploaded, fileId:`, uploadResponse.data.fileId);
-        }
-
-        // B.3: Atualizar relatório com os IDs das fotos
-        if (uploadedPhotoIds.length > 0) {
-          console.log('📝 Atualizando relatório com IDs das fotos...');
-
-          await defectInspectionReportAPI.update(createdReport.reportId, {
-            ...reportData,
-            photoFileIds: uploadedPhotoIds,
-          });
-
-          console.log('✅ Relatório atualizado com fotos');
-        }
-      }
-
-      Alert.alert('Sucesso', 'Relatório criado com sucesso!', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
-
-    } else {
-      // ========================================
-      // EDITAR RELATÓRIO EXISTENTE
-      // ========================================
-      console.log('✏️ Atualizando relatório:', reportId);
-
-      // ✅ CORREÇÃO CRÍTICA: 
-      // Se há fotos novas, fazer upload PRIMEIRO mas NÃO chamar update ainda
-
-      let newPhotoIds: number[] = [];
-
-      if (photosToUpload.length > 0) {
-        console.log(`📸 Fazendo upload de ${photosToUpload.length} novas fotos...`);
-
-        for (let i = 0; i < photosToUpload.length; i++) {
-          const photo = photosToUpload[i];
-
-          const formData = new FormData();
-          formData.append('file', {
-            uri: photo.uri,
-            type: 'image/jpeg',
-            name: photo.uri.split('/').pop() || `photo-${i}.jpg`,
-          } as any);
-
-          // ✅ Upload com o UUID do relatório
-          const uploadResponse = await httpClient.post(
-            `${API_CONFIG.baseFilesUrl}upload/${reportUuid}`,
-            formData,
-            {
-              headers: { 'Content-Type': 'multipart/form-data' },
-              onUploadProgress: (progressEvent) => {
-                const progress = (i + (progressEvent.loaded / (progressEvent.total || 1))) / photosToUpload.length;
-                setUploadProgress(progress);
-              },
-            }
-          );
-
-          newPhotoIds.push(uploadResponse.data.fileId);
-          console.log(`✅ Foto ${i + 1} uploaded, fileId:`, uploadResponse.data.fileId);
-        }
-      }
-
-      // ✅ AGORA SIM: Chamar update COM todas as fotos (antigas + novas)
-      const allPhotoIds = [...existingPhotoIds, ...newPhotoIds];
-
-      console.log('📸 Fotos existentes:', existingPhotoIds);
-      console.log('📸 Fotos novas:', newPhotoIds);
-      console.log('📸 Total a enviar no update:', allPhotoIds);
-
-      const reportData: any = {
-        site,
-        wtgNumber,
-        wtgType,
-        yearConstruction,
-        projectoId: projectId || 0,
-        turbinaId: turbineId || 0,
-        photoFileIds: allPhotoIds, // ✅ Todas as fotos (antigas + novas)
-        ...additionalData,
-      };
-
-      await defectInspectionReportAPI.update(reportId, reportData);
-
-      console.log('✅ Relatório atualizado via API');
-
-      Alert.alert('Sucesso', 'Relatório atualizado com sucesso!', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
-    }
-
-  } catch (error: any) {
-    console.error('❌ Erro ao guardar:', error);
-    Alert.alert(
-      'Erro',
-      error.response?.data?.message || error.message || 'Não foi possível guardar o relatório'
-    );
-  } finally {
-    setSaving(false);
+    setSaving(true);
     setUploadProgress(0);
-  }
-};
+
+    try {
+      const isOnline = await NetInfo.fetch().then((state) => state.isConnected);
+
+      // ========================================
+      // OPÇÃO A: ESTÁ OFFLINE
+      // ========================================
+      if (!isOnline) {
+        // [Manter código offline existente - não alterar]
+        // ...
+        return;
+      }
+
+      // ========================================
+      // OPÇÃO B: ESTÁ ONLINE → ENVIAR PARA API
+      // ========================================
+      console.log('🌐 ONLINE → Enviando para API...');
+
+      // ✅ CORREÇÃO: Separar fotos novas das existentes
+      const photosToUpload = photos.filter(p => p.uri && p.uri.trim() !== '' && !p.isUploaded);
+      // ✅ CORREÇÃO: Apenas incluir fileIds de fotos que TÊM URI
+      const existingPhotoIds: number[] = photos
+        .filter(p => p.fileId && p.uri && p.uri.trim() !== '')  // ✅ Verificar se tem URI!
+        .map(p => Number(p.fileId));
+
+      console.log(`📸 Fotos existentes: ${existingPhotoIds.length}`);
+      console.log(`📸 Fotos a enviar: ${photosToUpload.length}`);
+
+      // Preparar campos adicionais
+      const additionalData: Record<string, { label: string; value: string }> = {};
+      additionalFields.forEach((field, index) => {
+        if (field.label && field.value) {
+          additionalData[`additionalField${index + 1}`] = {
+            label: field.label,
+            value: field.value,
+          };
+        }
+      });
+
+      if (reportId === 0) {
+        // ========================================
+        // CRIAR NOVO RELATÓRIO
+        // ========================================
+        console.log('📝 Criando relatório via API...');
+
+        // B.1: Criar relatório SEM fotos
+        const reportData: any = {
+          site,
+          wtgNumber,
+          wtgType,
+          yearConstruction,
+          projectoId: projectId || 0,
+          turbinaId: turbineId || 0,
+          photoFileIds: [], // ✅ Criar SEM fotos primeiro
+          language: 'EN',
+          ...additionalData,
+        };
+
+        const createdReport = await defectInspectionReportAPI.create(reportData);
+        console.log('✅ Relatório criado:', createdReport.reportId);
+
+        // B.2: Se há fotos, fazer upload DEPOIS
+        if (photosToUpload.length > 0) {
+          console.log(`📸 Fazendo upload de ${photosToUpload.length} fotos...`);
+
+          const uploadedPhotoIds: number[] = [];
+
+          for (let i = 0; i < photosToUpload.length; i++) {
+            const photo = photosToUpload[i];
+
+            const formData = new FormData();
+            formData.append('file', {
+              uri: photo.uri,
+              type: 'image/jpeg',
+              name: photo.uri.split('/').pop() || `photo-${i}.jpg`,
+            } as any);
+
+            const uploadResponse = await httpClient.post(
+              `${API_CONFIG.baseFilesUrl}upload/${createdReport.uuid}`,
+              formData,
+              {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                onUploadProgress: (progressEvent) => {
+                  const progress = (i + (progressEvent.loaded / (progressEvent.total || 1))) / photosToUpload.length;
+                  setUploadProgress(progress);
+                },
+              }
+            );
+
+            uploadedPhotoIds.push(uploadResponse.data.fileId);
+            console.log(`✅ Foto ${i + 1} uploaded, fileId:`, uploadResponse.data.fileId);
+          }
+
+          // B.3: Atualizar relatório com os IDs das fotos
+          if (uploadedPhotoIds.length > 0) {
+            console.log('📝 Atualizando relatório com IDs das fotos...');
+
+            await defectInspectionReportAPI.update(createdReport.reportId, {
+              ...reportData,
+              photoFileIds: uploadedPhotoIds,
+            });
+
+            console.log('✅ Relatório atualizado com fotos');
+          }
+        }
+
+        Alert.alert('Sucesso', 'Relatório criado com sucesso!', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+
+      } else {
+        // ========================================
+        // EDITAR RELATÓRIO EXISTENTE
+        // ========================================
+        console.log('✏️ Atualizando relatório:', reportId);
+
+        // ✅ CORREÇÃO: Separar fotos por tipo
+        const photosToUpload = photos.filter(p => p.uri && p.uri.trim() !== '' && !p.isUploaded);
+
+        // Fotos existentes (que NÃO foram substituídas)
+        const existingPhotoIds: number[] = photos
+          .filter(p => p.fileId && p.uri && p.uri.trim() !== '' && !p.replacedFileId)
+          .map(p => Number(p.fileId));
+
+        // ✅ NOVO: Coletar IDs de fotos que foram SUBSTITUÍDAS
+        const replacedPhotoIds: number[] = photos
+          .filter(p => p.replacedFileId && p.uri && p.uri.trim() !== '')
+          .map(p => Number(p.replacedFileId));
+
+        console.log(`📸 Fotos existentes (não substituídas): ${existingPhotoIds.length}`, existingPhotoIds);
+        console.log(`📸 Fotos a enviar: ${photosToUpload.length}`);
+        console.log(`🔄 Fotos substituídas: ${replacedPhotoIds.length}`, replacedPhotoIds);
+
+        let newPhotoIds: number[] = [];
+
+        if (photosToUpload.length > 0) {
+          console.log(`📸 Fazendo upload de ${photosToUpload.length} novas fotos...`);
+
+          for (let i = 0; i < photosToUpload.length; i++) {
+            const photo = photosToUpload[i];
+
+            const formData = new FormData();
+            formData.append('file', {
+              uri: photo.uri,
+              type: 'image/jpeg',
+              name: photo.uri.split('/').pop() || `photo-${i}.jpg`,
+            } as any);
+
+            const uploadResponse = await httpClient.post(
+              `${API_CONFIG.baseFilesUrl}upload/${reportUuid}`,
+              formData,
+              {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                onUploadProgress: (progressEvent) => {
+                  const progress = (i + (progressEvent.loaded / (progressEvent.total || 1))) / photosToUpload.length;
+                  setUploadProgress(progress);
+                },
+              }
+            );
+
+            newPhotoIds.push(uploadResponse.data.fileId);
+            console.log(`✅ Foto ${i + 1} uploaded, fileId:`, uploadResponse.data.fileId);
+          }
+        }
+
+        // ✅ CORREÇÃO: Lista final NÃO inclui fotos substituídas
+        const allPhotoIds = [...existingPhotoIds, ...newPhotoIds];
+
+        console.log('📸 Fotos existentes (mantidas):', existingPhotoIds);
+        console.log('📸 Fotos novas (adicionadas/substitutas):', newPhotoIds);
+        console.log('🔄 Fotos que serão removidas (substituídas):', replacedPhotoIds);
+        console.log('📸 Total a enviar no update:', allPhotoIds);
+
+        const reportData: any = {
+          site,
+          wtgNumber,
+          wtgType,
+          yearConstruction,
+          projectoId: projectId || 0,
+          turbinaId: turbineId || 0,
+          photoFileIds: allPhotoIds,  // ✅ Não inclui as substituídas
+          ...additionalData,
+        };
+
+        await defectInspectionReportAPI.update(reportId, reportData);
+
+        console.log('✅ Relatório atualizado via API');
+
+        // ✅ OPCIONAL: Limpar replacedFileId após guardar
+        const cleanedPhotos = photos.map(p => ({
+          ...p,
+          replacedFileId: undefined,
+        }));
+        setPhotos(cleanedPhotos);
+
+        Alert.alert('Sucesso', 'Relatório atualizado com sucesso!', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      }
 
 
-/**
- * ===== RESUMO DA CORREÇÃO =====
- * 
- * ANTES (ERRADO):
- * 1. Upload fotos → Fotos associadas ao relatório via setUuid()
- * 2. Chamar update() → Já tem as fotos nas "antigas"
- * 3. Resultado: 0 alterações no histórico
- * 
- * DEPOIS (CORRETO - CRIAÇÃO):
- * 1. Criar relatório SEM fotos
- * 2. Upload das fotos com o UUID
- * 3. Update com os IDs das fotos
- * 4. Histórico: vazio na criação ✅
- * 
- * DEPOIS (CORRETO - EDIÇÃO):
- * 1. Upload das novas fotos com o UUID (elas são associadas)
- * 2. Preparar lista: existingPhotoIds + newPhotoIds
- * 3. Chamar update com a lista COMPLETA
- * 4. Backend compara: antigas vs novas
- * 5. Histórico: regista APENAS as fotos realmente adicionadas ✅
- * 
- * COM ESTA CORREÇÃO:
- * - Criar com 1 foto → Histórico vazio ✅
- * - Editar e adicionar 2ª foto → Histórico: "photo_added: ID 18537" ✅
- * - Editar e trocar foto → Histórico: "photo_removed" + "photo_added" ✅
- */
+    } catch (error: any) {
+      console.error('❌ Erro ao guardar:', error);
+      Alert.alert(
+        'Erro',
+        error.response?.data?.message || error.message || 'Não foi possível guardar o relatório'
+      );
+    } finally {
+      setSaving(false);
+      setUploadProgress(0);
+    }
+  };
+
+
+  /**
+   * ===== RESUMO DA CORREÇÃO =====
+   * 
+   * ANTES (ERRADO):
+   * 1. Upload fotos → Fotos associadas ao relatório via setUuid()
+   * 2. Chamar update() → Já tem as fotos nas "antigas"
+   * 3. Resultado: 0 alterações no histórico
+   * 
+   * DEPOIS (CORRETO - CRIAÇÃO):
+   * 1. Criar relatório SEM fotos
+   * 2. Upload das fotos com o UUID
+   * 3. Update com os IDs das fotos
+   * 4. Histórico: vazio na criação ✅
+   * 
+   * DEPOIS (CORRETO - EDIÇÃO):
+   * 1. Upload das novas fotos com o UUID (elas são associadas)
+   * 2. Preparar lista: existingPhotoIds + newPhotoIds
+   * 3. Chamar update com a lista COMPLETA
+   * 4. Backend compara: antigas vs novas
+   * 5. Histórico: regista APENAS as fotos realmente adicionadas ✅
+   * 
+   * COM ESTA CORREÇÃO:
+   * - Criar com 1 foto → Histórico vazio ✅
+   * - Editar e adicionar 2ª foto → Histórico: "photo_added: ID 18537" ✅
+   * - Editar e trocar foto → Histórico: "photo_removed" + "photo_added" ✅
+   */
 
   // Fotos
   const handleTakePhoto = async () => {
@@ -577,13 +599,26 @@ const handleSave = async () => {
 
     if (!result.canceled && selectedPhotoIndex !== null) {
       const newPhotos = [...photos];
+      const currentPhoto = newPhotos[selectedPhotoIndex];
+
+      // ✅ CORREÇÃO: Guardar o fileId antigo se existir
+      const oldFileId = currentPhoto.fileId;
+
       newPhotos[selectedPhotoIndex] = {
-        ...newPhotos[selectedPhotoIndex],
+        ...currentPhoto,
         uri: result.assets[0].uri,
+        fileId: undefined,              // Limpar fileId
         isUploaded: false,
+        description: '',
+        replacedFileId: oldFileId,      // ✅ Marcar como substituída
       };
+
       setPhotos(newPhotos);
       setPhotoDialogVisible(false);
+
+      if (oldFileId) {
+        console.log(`🔄 Foto ${selectedPhotoIndex} trocada: ${oldFileId} será substituída`);
+      }
     }
   };
 
@@ -603,44 +638,57 @@ const handleSave = async () => {
 
     if (!result.canceled && selectedPhotoIndex !== null) {
       const newPhotos = [...photos];
+      const currentPhoto = newPhotos[selectedPhotoIndex];
+
+      // ✅ CORREÇÃO: Guardar o fileId antigo se existir
+      const oldFileId = currentPhoto.fileId;
+
       newPhotos[selectedPhotoIndex] = {
-        ...newPhotos[selectedPhotoIndex],
+        ...currentPhoto,
         uri: result.assets[0].uri,
+        fileId: undefined,              // Limpar fileId
         isUploaded: false,
+        description: '',
+        replacedFileId: oldFileId,      // ✅ Marcar como substituída
       };
+
       setPhotos(newPhotos);
       setPhotoDialogVisible(false);
+
+      if (oldFileId) {
+        console.log(`🔄 Foto ${selectedPhotoIndex} trocada: ${oldFileId} será substituída`);
+      }
     }
   };
 
-const handleRemovePhoto = () => {
-  if (selectedPhotoIndex === null) return;
+  const handleRemovePhoto = () => {
+    if (selectedPhotoIndex === null) return;
 
-  Alert.alert(
-    'Remover Foto',
-    'Tem a certeza?',
-    [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Remover',
-        style: 'destructive',
-        onPress: () => {
-          const newPhotos = [...photos];
-          // ✅ CORREÇÃO: Limpar TODOS os campos
-          newPhotos[selectedPhotoIndex] = {
-            ...newPhotos[selectedPhotoIndex],
-            uri: '',              // ✅ Limpar URI
-            fileId: undefined,    // ✅ IMPORTANTE: Remover fileId!
-            isUploaded: false,    // ✅ Marcar como não carregada
-            description: '',      // ✅ Limpar descrição
-          };
-          setPhotos(newPhotos);
-          setPhotoDialogVisible(false);
+    Alert.alert(
+      'Remover Foto',
+      'Tem a certeza?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Remover',
+          style: 'destructive',
+          onPress: () => {
+            const newPhotos = [...photos];
+            newPhotos[selectedPhotoIndex] = {
+              ...newPhotos[selectedPhotoIndex],
+              uri: '',
+              fileId: undefined,
+              isUploaded: false,
+              description: '',
+              replacedFileId: undefined,  // ✅ Limpar também
+            };
+            setPhotos(newPhotos);
+            setPhotoDialogVisible(false);
+          },
         },
-      },
-    ]
-  );
-};
+      ]
+    );
+  };
 
   // Campos adicionais
   const handleSaveField = () => {

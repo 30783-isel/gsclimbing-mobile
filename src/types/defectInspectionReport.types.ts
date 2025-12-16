@@ -21,13 +21,13 @@ export interface DefectInspectionReportData {
 export interface PhotoData {
   id: string;
   uri: string;
-  base64?: string;
-  description: string;
-  pageNumber: number; // 2 ou 3
-  position: number; // 1-4
+  pageNumber: number;
+  position: number;
   timestamp: number;
   isUploaded: boolean;
-  fileId?: string; // ID retornado pelo backend após upload
+  fileId?: string;
+  description: string;
+  replacedFileId?: string;  // ✅ NOVO: ID da foto que foi substituída
 }
 
 export interface AdditionalField {
