@@ -4,4 +4,4 @@
  * Screen de Lista dos Performance Reports (TECH)
  */
 
-export { default } from '@/components/reports/performance-repair-elevator/PerformanceRepairElevatorListItem';
+export { default } from '@/screens/reports/performance-repair-elevator/PerformanceRepairElevatorListScreen';
