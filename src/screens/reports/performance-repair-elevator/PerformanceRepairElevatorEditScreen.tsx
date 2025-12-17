@@ -107,78 +107,97 @@ export default function PerformanceRepairElevatorEditScreen() {
     setIsOnline(state.isConnected ?? false);
   };
 
+
   const loadData = async () => {
-    console.log('🔍 loadData called with reportId:', reportId);
+  console.log('🔍 loadData called with reportId:', reportId);
+  
+  try {
+    // Modo criar novo
+    if (reportId === 0) {
+      console.log('✅ Modo CREATE - inicializando fotos vazias');
+      // Inicializar fotos vazias
+      const emptyPhotos: PhotoData[] = Array.from({ length: 4 }, (_, i) => ({
+        id: `photo-${i}`,
+        uri: '',
+        pageNumber: 4,
+        position: i + 1,
+        timestamp: Date.now(),
+        isUploaded: false,
+        description: '',
+      }));
+      setPhotos(emptyPhotos);
+      setLoading(false);
+      console.log('✅ CREATE mode initialized');
+      return;
+    }
+
+    // Modo editar - carregar relatório existente
+    console.log('📥 Fetching report from API...');
+    const report = await performanceRepairElevatorAPI.getById(reportId);
+    console.log('📦 Report received:', report);
     
+    if (!report) {
+      console.error('❌ Report is null/undefined');
+      Alert.alert('Erro', 'Relatório não encontrado');
+      setLoading(false);
+      router.back();
+      return;
+    }
+    
+    console.log('📝 Setting basic fields...');
+    setSite(report.site || '');
+    setWtgNumber(report.wtgNumber || '');
+    setWtgType(report.wtgType || '');
+    setYearConstruction(report.yearConstruction || '');
+    setReportUuid(report.uuid || '');
+    
+    // ✅ CORREÇÃO: Ler dos campos ESPECÍFICOS da entidade PerformanceReportRepairElevator
+    console.log('📝 Setting specific fields...');
+    setInspectors(report.inpectorsWorkers || '');           // ✅ Campo específico
+    setWorkCompleted((report.workCompleted || '') as any);  // ✅ Campo específico
+    setWindturbineOperable((report.turbineOperable || '') as any); // ✅ Campo específico
+    setPerformanceReport(report.performanceReport || '');   // ✅ Campo específico
+    
+    // Outros campos específicos (se necessário)
+    // setReportNumber(report.reportNumber || '');
+    // setStatementOfwork(report.statementOfwork || '');
+    // setPlaceDate(report.placeDate || '');
+    // setResponsibleTechnician(report.responsibleTechnician || '');
+
+    // Carregar campos adicionais genéricos (se existirem)
+    const additionalFieldsData: AdditionalField[] = [];
+    for (let i = 1; i <= 7; i++) {
+      const label = report[`additionalField${i}Label`];
+      const text = report[`additionalField${i}Text`];
+      if (label && text) {
+        additionalFieldsData.push({ label, value: text });
+      }
+    }
+    setAdditionalFields(additionalFieldsData);
+
+    // Carregar fotos
+    console.log('📸 Loading photos...');
     try {
-      // Modo criar novo
-      if (reportId === 0) {
-        console.log('✅ Modo CREATE - inicializando fotos vazias');
-        // Inicializar fotos vazias
-        const emptyPhotos: PhotoData[] = Array.from({ length: 4 }, (_, i) => ({
-          id: `photo-${i}`,
-          uri: '',
-          pageNumber: 4,
-          position: i + 1,
-          timestamp: Date.now(),
-          isUploaded: false,
-          description: '',
-        }));
-        setPhotos(emptyPhotos);
-        setLoading(false);
-        console.log('✅ CREATE mode initialized');
-        return;
-      }
-
-      // Modo editar - carregar relatório existente
-      console.log('📥 Fetching report from API...');
-      const report = await performanceRepairElevatorAPI.getById(reportId);
-      console.log('📦 Report received:', report);
+      const existingPhotos = await performanceRepairElevatorAPI.getPhotos(reportId);
+      console.log('📸 Photos received:', existingPhotos?.length || 0);
       
-      if (!report) {
-        console.error('❌ Report is null/undefined');
-        Alert.alert('Erro', 'Relatório não encontrado');
-        setLoading(false);
-        router.back();
-        return;
-      }
-      
-      console.log('📝 Setting basic fields...');
-      setSite(report.site || '');
-      setWtgNumber(report.wtgNumber || '');
-      setWtgType(report.wtgType || '');
-      setYearConstruction(report.yearConstruction || '');
-      setReportUuid(report.uuid || '');
-      
-      // Extrair campos do relatório (usando additionalField1-7)
-      console.log('📝 Setting additional fields...');
-      setInspectors(report.additionalField1Text || '');
-      setWorkCompleted((report.additionalField2Text || '') as any);
-      setWindturbineOperable((report.additionalField3Text || '') as any);
-      setPerformanceReport(report.additionalField4Text || '');
-
-      // Carregar fotos
-      console.log('📸 Loading photos...');
-      try {
-        const existingPhotos = await performanceRepairElevatorAPI.getPhotos(reportId);
-        console.log('📸 Photos received:', existingPhotos?.length || 0);
+      const initialPhotos: PhotoData[] = Array.from({ length: 4 }, (_, i) => {
+        const existingPhoto = existingPhotos?.find(
+          (p: any) => p.position === i + 1
+        );
         
-        const initialPhotos: PhotoData[] = Array.from({ length: 4 }, (_, i) => {
-          const existingPhoto = existingPhotos?.[i];
-          
-          if (existingPhoto) {
-            return {
-              id: `photo-${i}`,
-              uri: existingPhoto.downloadUrl || '',
-              pageNumber: 4,
-              position: i + 1,
-              timestamp: Date.now(),
-              isUploaded: true,
-              fileId: String(existingPhoto.fileId || ''),
-              description: existingPhoto.description || '',
-            };
-          }
-
+        if (existingPhoto) {
+          return {
+            id: String(existingPhoto.fileId),
+            uri: existingPhoto.downloadUrl || '',
+            pageNumber: 4,
+            position: i + 1,
+            timestamp: Date.now(),
+            isUploaded: true,
+            fileId: String(existingPhoto.fileId),
+            description: existingPhoto.description || '',
+          };
+        } else {
           return {
             id: `photo-${i}`,
             uri: '',
@@ -188,54 +207,37 @@ export default function PerformanceRepairElevatorEditScreen() {
             isUploaded: false,
             description: '',
           };
-        });
-        setPhotos(initialPhotos);
-        console.log('✅ Photos initialized');
-      } catch (photoError) {
-        console.error('❌ Error loading photos:', photoError);
-        // Inicializar fotos vazias em caso de erro
-        const emptyPhotos: PhotoData[] = Array.from({ length: 4 }, (_, i) => ({
-          id: `photo-${i}`,
-          uri: '',
-          pageNumber: 4,
-          position: i + 1,
-          timestamp: Date.now(),
-          isUploaded: false,
-          description: '',
-        }));
-        setPhotos(emptyPhotos);
-      }
-
-      // Carregar campos adicionais extras (5, 6, 7)
-      console.log('📝 Loading extra fields...');
-      const fields: AdditionalField[] = [];
-      if (report.additionalField5Label && report.additionalField5Text) {
-        fields.push({ label: report.additionalField5Label, value: report.additionalField5Text });
-      }
-      if (report.additionalField6Label && report.additionalField6Text) {
-        fields.push({ label: report.additionalField6Label, value: report.additionalField6Text });
-      }
-      if (report.additionalField7Label && report.additionalField7Text) {
-        fields.push({ label: report.additionalField7Label, value: report.additionalField7Text });
-      }
-      setAdditionalFields(fields);
-      console.log('✅ Extra fields loaded:', fields.length);
-
-      setLoading(false);
-      console.log('✅ loadData completed successfully');
-    } catch (error: any) {
-      console.error('❌ ERROR in loadData:', error);
-      console.error('Error stack:', error?.stack);
-      console.error('Error message:', error?.message);
+        }
+      });
       
-      Alert.alert(
-        'Erro ao Carregar', 
-        `Detalhes: ${error?.message || 'Erro desconhecido'}\n\nVerifique a consola para mais informações.`
-      );
+      setPhotos(initialPhotos);
+      console.log('✅ Photos loaded');
       
-      setLoading(false);
+    } catch (photoError) {
+      console.error('⚠️ Error loading photos:', photoError);
+      // Inicializar fotos vazias se houver erro
+      const emptyPhotos: PhotoData[] = Array.from({ length: 4 }, (_, i) => ({
+        id: `photo-${i}`,
+        uri: '',
+        pageNumber: 4,
+        position: i + 1,
+        timestamp: Date.now(),
+        isUploaded: false,
+        description: '',
+      }));
+      setPhotos(emptyPhotos);
     }
-  };
+    
+    setLoading(false);
+    console.log('✅ Data loaded successfully');
+    
+  } catch (error) {
+    console.error('❌ Error in loadData:', error);
+    Alert.alert('Erro', 'Não foi possível carregar o relatório');
+    setLoading(false);
+    router.back();
+  }
+};
 
   // ====================================================================
   // Validação
