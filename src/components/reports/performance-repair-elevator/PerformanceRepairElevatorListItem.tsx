@@ -23,19 +23,30 @@ export default function PerformanceRepairElevatorListItem({
   onDelete,
   onHistory,
 }: PerformanceRepairElevatorListItemProps) {
+  // ✅ VALIDAÇÃO: Se report não existe, não renderizar nada
+  if (!report) {
+    console.error('PerformanceRepairElevatorListItem: report is undefined');
+    return null;
+  }
+
   // Formatar data
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('pt-PT', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('pt-PT', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      });
+    } catch (error) {
+      return 'N/A';
+    }
   };
 
   // Status do relatório
   const getStatusChip = () => {
-    if (report.locked === 'Y') {
+    if (report?.locked === 'Y') {
       return (
         <Chip
           icon="lock"
@@ -48,7 +59,7 @@ export default function PerformanceRepairElevatorListItem({
       );
     }
 
-    if (report.permission2Edit === 'N') {
+    if (report?.permission2Edit === 'N') {
       return (
         <Chip
           icon="lock-open-variant"
@@ -80,10 +91,10 @@ export default function PerformanceRepairElevatorListItem({
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <Text variant="titleMedium" style={styles.title}>
-              {report.site}
+              {report?.site || 'Sem site'}
             </Text>
             <Text variant="bodyMedium" style={styles.subtitle}>
-              WTG: {report.wtgNumber}
+              WTG: {report?.wtgNumber || 'N/A'}
             </Text>
           </View>
           <View style={styles.headerRight}>{getStatusChip()}</View>
@@ -96,22 +107,22 @@ export default function PerformanceRepairElevatorListItem({
               Criado:
             </Text>
             <Text variant="bodySmall" style={styles.detailValue}>
-              {formatDate(report.createDate)}
+              {formatDate(report?.createDate || '')}
             </Text>
           </View>
 
-          {report.modifiedDate && report.modifiedDate !== report.createDate && (
+          {report?.modifiedDate && report?.modifiedDate !== report?.createDate && (
             <View style={styles.detailRow}>
               <Text variant="bodySmall" style={styles.detailLabel}>
                 Modificado:
               </Text>
               <Text variant="bodySmall" style={styles.detailValue}>
-                {formatDate(report.modifiedDate)}
+                {formatDate(report?.modifiedDate)}
               </Text>
             </View>
           )}
 
-          {report.isOffline && (
+          {report?.isOffline && (
             <View style={styles.detailRow}>
               <Chip
                 icon="wifi-off"
@@ -135,7 +146,7 @@ export default function PerformanceRepairElevatorListItem({
               style={styles.actionButton}
             />
           )}
-          {onDelete && report.permission2Edit === 'Y' && (
+          {onDelete && report?.permission2Edit === 'Y' && (
             <IconButton
               icon="delete"
               size={20}

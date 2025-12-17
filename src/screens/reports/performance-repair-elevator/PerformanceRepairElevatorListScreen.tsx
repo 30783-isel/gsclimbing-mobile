@@ -1,4 +1,8 @@
-// src/screens/reports/performance-repair-elevator/PerformanceRepairElevatorListScreen.tsx
+/**
+ * PerformanceRepairElevatorListScreen
+ * 
+ * Ecrã de lista dos Performance Report Repair Elevator
+ */
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -51,11 +55,35 @@ export default function PerformanceRepairElevatorListScreen() {
   const loadReports = async () => {
     try {
       setLoading(true);
+      console.log('🔍 Loading reports for turbine:', turbineId);
+      
       const data = await performanceRepairElevatorAPI.getByTurbine(turbineId);
-      setReports(data);
-    } catch (error) {
-      console.error('Error loading reports:', error);
-      Alert.alert('Erro', 'Não foi possível carregar os relatórios');
+      console.log('📦 Reports received:', data);
+      console.log('📊 Number of reports:', data?.length || 0);
+      
+      // ✅ VALIDAÇÃO: Garantir que data é um array
+      if (!data) {
+        console.warn('⚠️ API returned null/undefined');
+        setReports([]);
+      } else if (!Array.isArray(data)) {
+        console.warn('⚠️ API did not return an array:', typeof data);
+        setReports([]);
+      } else {
+        // ✅ FILTRAR reports undefined/null
+        const validReports = data.filter(report => report != null);
+        console.log('✅ Valid reports:', validReports.length);
+        setReports(validReports);
+      }
+    } catch (error: any) {
+      console.error('❌ Error loading reports:', error);
+      console.error('Error message:', error?.message);
+      console.error('Error response:', error?.response?.data);
+      
+      Alert.alert(
+        'Erro', 
+        `Não foi possível carregar os relatórios.\n\nDetalhes: ${error?.message || 'Erro desconhecido'}`
+      );
+      setReports([]);
     } finally {
       setLoading(false);
     }
@@ -75,8 +103,8 @@ export default function PerformanceRepairElevatorListScreen() {
               await performanceRepairElevatorAPI.delete(reportId);
               await loadReports();
               Alert.alert('Sucesso', 'Relatório eliminado com sucesso');
-            } catch (error) {
-              Alert.alert('Erro', 'Não foi possível eliminar o relatório');
+            } catch (error: any) {
+              Alert.alert('Erro', error?.message || 'Não foi possível eliminar o relatório');
             }
           },
         },
@@ -87,6 +115,32 @@ export default function PerformanceRepairElevatorListScreen() {
   const handleHistory = (reportId: number) => {
     Alert.alert('Histórico', `Ver histórico do relatório ${reportId}`);
     // TODO: Implementar ecrã de histórico
+  };
+
+  const handleCreateNew = () => {
+    console.log('➕ Creating new report for turbine:', turbineId);
+    router.push({
+      pathname: `${basePath}/reports/performance-repair-elevator/edit` as any,
+      params: {
+        reportId: '0',
+        turbineId: turbineId.toString(),
+        projectName: params.projectName,
+        turbineName: params.turbineName,
+      },
+    });
+  };
+
+  const handleEditReport = (report: Report) => {
+    console.log('✏️ Editing report:', report.reportId);
+    router.push({
+      pathname: `${basePath}/reports/performance-repair-elevator/edit` as any,
+      params: {
+        reportId: report.reportId.toString(),
+        turbineId: turbineId.toString(),
+        projectName: params.projectName,
+        turbineName: params.turbineName,
+      },
+    });
   };
 
   if (loading) {
@@ -129,28 +183,29 @@ export default function PerformanceRepairElevatorListScreen() {
           <Text variant="bodyMedium" style={styles.emptyText}>
             Ainda não existem relatórios para esta turbina.
           </Text>
+          <Text variant="bodySmall" style={styles.emptyHint}>
+            Clique no botão + para criar o primeiro relatório
+          </Text>
         </View>
       ) : (
         <ScrollView style={styles.scrollView}>
-          {reports.map((report) => (
-            <PerformanceRepairElevatorListItem
-              key={report.reportId}
-              report={report}
-              onPress={() =>
-                router.push({
-                  pathname: `${basePath}/reports/performance-repair-elevator/edit` as any,
-                  params: {
-                    reportId: report.reportId.toString(),
-                    turbineId: turbineId.toString(),
-                    projectName: params.projectName,
-                    turbineName: params.turbineName,
-                  },
-                })
-              }
-              onDelete={() => handleDelete(report.reportId)}
-              onHistory={() => handleHistory(report.reportId)}
-            />
-          ))}
+          {reports.map((report) => {
+            // ✅ VALIDAÇÃO EXTRA: Verificar se report existe antes de renderizar
+            if (!report || !report.reportId) {
+              console.warn('⚠️ Skipping invalid report:', report);
+              return null;
+            }
+            
+            return (
+              <PerformanceRepairElevatorListItem
+                key={report.reportId}
+                report={report}
+                onPress={() => handleEditReport(report)}
+                onDelete={() => handleDelete(report.reportId)}
+                onHistory={() => handleHistory(report.reportId)}
+              />
+            );
+          })}
         </ScrollView>
       )}
 
@@ -158,17 +213,7 @@ export default function PerformanceRepairElevatorListScreen() {
       <FAB
         icon="plus"
         style={styles.fab}
-        onPress={() =>
-          router.push({
-            pathname: `${basePath}/reports/performance-repair-elevator/edit` as any,
-            params: {
-              reportId: '0',
-              turbineId: turbineId.toString(),
-              projectName: params.projectName,
-              turbineName: params.turbineName,
-            },
-          })
-        }
+        onPress={handleCreateNew}
         label="Novo Relatório"
       />
     </View>
@@ -184,6 +229,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.background,
   },
   loadingText: {
     marginTop: spacing.md,
@@ -217,10 +263,16 @@ const styles = StyleSheet.create({
   emptyTitle: {
     marginTop: spacing.md,
     color: colors.textSecondary,
+    fontWeight: 'bold',
   },
   emptyText: {
     marginTop: spacing.sm,
     color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  emptyHint: {
+    marginTop: spacing.lg,
+    color: colors.primary,
     textAlign: 'center',
   },
   scrollView: {

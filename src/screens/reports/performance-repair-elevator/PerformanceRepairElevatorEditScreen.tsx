@@ -107,9 +107,12 @@ export default function PerformanceRepairElevatorEditScreen() {
   };
 
   const loadData = async () => {
+    console.log('🔍 loadData called with reportId:', reportId);
+    
     try {
       // Modo criar novo
       if (reportId === 0) {
+        console.log('✅ Modo CREATE - inicializando fotos vazias');
         // Inicializar fotos vazias
         const emptyPhotos: PhotoData[] = Array.from({ length: 4 }, (_, i) => ({
           id: `photo-${i}`,
@@ -122,17 +125,28 @@ export default function PerformanceRepairElevatorEditScreen() {
         }));
         setPhotos(emptyPhotos);
         setLoading(false);
+        console.log('✅ CREATE mode initialized');
         return;
       }
 
       // Modo editar - carregar relatório existente
+      console.log('📥 Fetching report from API...');
       const report = await performanceRepairElevatorAPI.getById(reportId);
+      console.log('📦 Report received:', report);
       
       if (!report) {
+        console.error('❌ Report is null/undefined');
         Alert.alert('Erro', 'Relatório não encontrado');
+        setLoading(false);
         router.back();
         return;
       }
+      
+      console.log('📝 Setting basic fields...');
+      console.log('  - site:', report.site);
+      console.log('  - wtgNumber:', report.wtgNumber);
+      console.log('  - wtgType:', report.wtgType);
+      console.log('  - yearConstruction:', report.yearConstruction);
       
       setSite(report.site || '');
       setWtgNumber(report.wtgNumber || '');
@@ -140,12 +154,11 @@ export default function PerformanceRepairElevatorEditScreen() {
       setYearConstruction(report.yearConstruction || '');
       
       // Extrair campos do relatório (usando additionalField1-7)
-      // Os campos estão mapeados assim:
-      // Field 1: Inspectors
-      // Field 2: Work Completed  
-      // Field 3: Windturbine Operable
-      // Field 4: Performance Report
-      // Fields 5-7: Campos extras do utilizador
+      console.log('📝 Setting additional fields...');
+      console.log('  - additionalField1Text:', report.additionalField1Text);
+      console.log('  - additionalField2Text:', report.additionalField2Text);
+      console.log('  - additionalField3Text:', report.additionalField3Text);
+      console.log('  - additionalField4Text:', report.additionalField4Text);
       
       setInspectors(report.additionalField1Text || '');
       setWorkCompleted((report.additionalField2Text || '') as any);
@@ -153,24 +166,43 @@ export default function PerformanceRepairElevatorEditScreen() {
       setPerformanceReport(report.additionalField4Text || '');
 
       // Carregar fotos
-      const existingPhotos = await performanceRepairElevatorAPI.getPhotos(reportId);
-      const initialPhotos: PhotoData[] = Array.from({ length: 4 }, (_, i) => {
-        const existingPhoto = existingPhotos[i];
+      console.log('📸 Loading photos...');
+      try {
+        const existingPhotos = await performanceRepairElevatorAPI.getPhotos(reportId);
+        console.log('📸 Photos received:', existingPhotos?.length || 0);
         
-        if (existingPhoto) {
+        const initialPhotos: PhotoData[] = Array.from({ length: 4 }, (_, i) => {
+          const existingPhoto = existingPhotos?.[i];
+          
+          if (existingPhoto) {
+            return {
+              id: `photo-${i}`,
+              uri: existingPhoto.downloadUrl || '',
+              pageNumber: 4,
+              position: i + 1,
+              timestamp: Date.now(),
+              isUploaded: true,
+              fileId: String(existingPhoto.fileId || ''),
+              description: existingPhoto.description || '',
+            };
+          }
+
           return {
             id: `photo-${i}`,
-            uri: existingPhoto.downloadUrl,
+            uri: '',
             pageNumber: 4,
             position: i + 1,
             timestamp: Date.now(),
-            isUploaded: true,
-            fileId: String(existingPhoto.fileId),
-            description: existingPhoto.description || '',
+            isUploaded: false,
+            description: '',
           };
-        }
-
-        return {
+        });
+        setPhotos(initialPhotos);
+        console.log('✅ Photos initialized');
+      } catch (photoError) {
+        console.error('❌ Error loading photos:', photoError);
+        // Inicializar fotos vazias em caso de erro
+        const emptyPhotos: PhotoData[] = Array.from({ length: 4 }, (_, i) => ({
           id: `photo-${i}`,
           uri: '',
           pageNumber: 4,
@@ -178,11 +210,12 @@ export default function PerformanceRepairElevatorEditScreen() {
           timestamp: Date.now(),
           isUploaded: false,
           description: '',
-        };
-      });
-      setPhotos(initialPhotos);
+        }));
+        setPhotos(emptyPhotos);
+      }
 
       // Carregar campos adicionais extras (5, 6, 7)
+      console.log('📝 Loading extra fields...');
       const fields: AdditionalField[] = [];
       if (report.additionalField5Label && report.additionalField5Text) {
         fields.push({ label: report.additionalField5Label, value: report.additionalField5Text });
@@ -194,13 +227,22 @@ export default function PerformanceRepairElevatorEditScreen() {
         fields.push({ label: report.additionalField7Label, value: report.additionalField7Text });
       }
       setAdditionalFields(fields);
+      console.log('✅ Extra fields loaded:', fields.length);
 
       setLoading(false);
+      console.log('✅ loadData completed successfully');
     } catch (error: any) {
-      console.error('Error loading report:', error);
-      Alert.alert('Erro', error?.message || 'Não foi possível carregar o relatório');
+      console.error('❌ ERROR in loadData:', error);
+      console.error('Error stack:', error?.stack);
+      console.error('Error message:', error?.message);
+      
+      Alert.alert(
+        'Erro ao Carregar', 
+        `Detalhes: ${error?.message || 'Erro desconhecido'}\n\nVerifique a consola para mais informações.`
+      );
+      
       setLoading(false);
-      router.back();
+      // NÃO fazer router.back() aqui - deixar o utilizador ver o erro
     }
   };
 
