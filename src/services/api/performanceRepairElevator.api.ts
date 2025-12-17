@@ -8,6 +8,7 @@ import type {
   PerformanceRepairElevatorResponse,
   PhotoData,
 } from '@/types/performanceRepairElevator.types';
+import { Report } from '@/types';
 
 export const performanceRepairElevatorAPI = {
   /**
@@ -161,4 +162,13 @@ export const performanceRepairElevatorAPI = {
       `${API_CONFIG.baseMobileReportsUrl}performance-repair-elevator/${reportId}`
     );
   },
+  /**
+ * Obter todos os relatórios de uma turbina
+ */
+getByTurbine: async (turbineId: number): Promise<Report[]> => {
+  const response = await httpClient.get(
+    `${API_CONFIG.baseMobileReportsUrl}performance-repair-elevator/turbine/${turbineId}`
+  );
+  return response.data;
+},
 };

@@ -317,7 +317,7 @@ export default function TurbineDetailsScreen() {
       });
     } else if (reportType === ReportType.PERFORMANCE_REPAIR_ELEVATOR) {
         router.push({
-          pathname: '/reports/performance-repair-elevator/create',
+          pathname: `${basePath}/reports/performance-repair-elevator/edit` as any,
           params: {
           projectoId: id,
           turbinaId: turbineId,
