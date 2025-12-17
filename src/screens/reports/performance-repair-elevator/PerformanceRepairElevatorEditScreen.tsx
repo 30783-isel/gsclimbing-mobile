@@ -64,6 +64,7 @@ export default function PerformanceRepairElevatorEditScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  const [reportUuid, setReportUuid] = useState<string>('');
 
   // Página 1: Dados Fundamentais
   const [site, setSite] = useState('');
@@ -143,23 +144,14 @@ export default function PerformanceRepairElevatorEditScreen() {
       }
       
       console.log('📝 Setting basic fields...');
-      console.log('  - site:', report.site);
-      console.log('  - wtgNumber:', report.wtgNumber);
-      console.log('  - wtgType:', report.wtgType);
-      console.log('  - yearConstruction:', report.yearConstruction);
-      
       setSite(report.site || '');
       setWtgNumber(report.wtgNumber || '');
       setWtgType(report.wtgType || '');
       setYearConstruction(report.yearConstruction || '');
+      setReportUuid(report.uuid || '');
       
       // Extrair campos do relatório (usando additionalField1-7)
       console.log('📝 Setting additional fields...');
-      console.log('  - additionalField1Text:', report.additionalField1Text);
-      console.log('  - additionalField2Text:', report.additionalField2Text);
-      console.log('  - additionalField3Text:', report.additionalField3Text);
-      console.log('  - additionalField4Text:', report.additionalField4Text);
-      
       setInspectors(report.additionalField1Text || '');
       setWorkCompleted((report.additionalField2Text || '') as any);
       setWindturbineOperable((report.additionalField3Text || '') as any);
@@ -242,7 +234,6 @@ export default function PerformanceRepairElevatorEditScreen() {
       );
       
       setLoading(false);
-      // NÃO fazer router.back() aqui - deixar o utilizador ver o erro
     }
   };
 
@@ -278,19 +269,9 @@ export default function PerformanceRepairElevatorEditScreen() {
     setSaving(true);
 
     try {
-      // Upload fotos novas
-      const uploadedPhotos = [...photos];
-      for (let i = 0; i < uploadedPhotos.length; i++) {
-        const photo = uploadedPhotos[i];
-        if (photo.uri && !photo.isUploaded) {
-          const uploaded = await performanceRepairElevatorAPI.uploadPhoto(photo);
-          uploadedPhotos[i] = {
-            ...photo,
-            fileId: String(uploaded.fileId),
-            isUploaded: true,
-          };
-        }
-      }
+      console.log('💾 Starting save process...');
+      let savedReportUuid = reportUuid;
+      let savedReportId = reportId;
 
       const data: PerformanceRepairElevatorData = {
         site,
@@ -303,25 +284,68 @@ export default function PerformanceRepairElevatorEditScreen() {
         performanceReport,
         projectoId: projectId,
         turbinaId: turbineId,
-        photos: uploadedPhotos,
+        photos: [], // ✅ Criar sem fotos primeiro
         additionalFields,
       };
 
+      // 1. Criar/Atualizar relatório PRIMEIRO (sem fotos)
       if (reportId === 0) {
-        // Criar novo
-        await performanceRepairElevatorAPI.create(data);
-        Alert.alert('Sucesso', 'Relatório criado com sucesso', [
-          { text: 'OK', onPress: () => router.back() },
-        ]);
+        console.log('📝 Creating new report...');
+        const result = await performanceRepairElevatorAPI.create(data);
+        savedReportUuid = result.uuid;
+        savedReportId = result.reportId;
+        setReportUuid(result.uuid);
+        console.log('✅ Report created:', result.reportId, result.uuid);
       } else {
-        // Atualizar
+        console.log('📝 Updating existing report...');
         await performanceRepairElevatorAPI.update(reportId, data);
-        Alert.alert('Sucesso', 'Relatório atualizado com sucesso', [
-          { text: 'OK', onPress: () => router.back() },
-        ]);
+        console.log('✅ Report updated');
       }
+
+      // 2. Upload fotos novas (com o UUID do relatório)
+      console.log('📸 Starting photo uploads...');
+      const uploadedPhotos = [...photos];
+      let photosChanged = false;
+
+      for (let i = 0; i < uploadedPhotos.length; i++) {
+        const photo = uploadedPhotos[i];
+        if (photo.uri && !photo.isUploaded) {
+          console.log(`📤 Uploading photo ${i + 1}...`);
+          try {
+            const uploaded = await performanceRepairElevatorAPI.uploadPhoto(photo, savedReportUuid);
+            uploadedPhotos[i] = {
+              ...photo,
+              fileId: String(uploaded.fileId),
+              isUploaded: true,
+            };
+            photosChanged = true;
+            console.log(`✅ Photo ${i + 1} uploaded:`, uploaded.fileId);
+          } catch (photoError) {
+            console.error(`❌ Error uploading photo ${i + 1}:`, photoError);
+            // Continuar com as outras fotos
+          }
+        }
+      }
+
+      // 3. Se houve fotos novas, atualizar relatório com IDs das fotos
+      if (photosChanged) {
+        console.log('📝 Updating report with photo IDs...');
+        const finalData: PerformanceRepairElevatorData = {
+          ...data,
+          photos: uploadedPhotos,
+        };
+        await performanceRepairElevatorAPI.update(savedReportId, finalData);
+        console.log('✅ Report updated with photos');
+      }
+
+      setPhotos(uploadedPhotos);
+      console.log('✅ Save process completed');
+
+      Alert.alert('Sucesso', 'Relatório guardado com sucesso', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
     } catch (error: any) {
-      console.error('Error saving report:', error);
+      console.error('❌ Error saving report:', error);
       Alert.alert('Erro', error.message || 'Não foi possível guardar o relatório');
     } finally {
       setSaving(false);

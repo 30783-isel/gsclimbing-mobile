@@ -52,42 +52,38 @@ export default function PerformanceRepairElevatorListScreen() {
     setIsOnline(state.isConnected ?? false);
   };
 
-  const loadReports = async () => {
-    try {
-      setLoading(true);
-      console.log('🔍 Loading reports for turbine:', turbineId);
-      
-      const data = await performanceRepairElevatorAPI.getByTurbine(turbineId);
-      console.log('📦 Reports received:', data);
-      console.log('📊 Number of reports:', data?.length || 0);
-      
-      // ✅ VALIDAÇÃO: Garantir que data é um array
-      if (!data) {
-        console.warn('⚠️ API returned null/undefined');
-        setReports([]);
-      } else if (!Array.isArray(data)) {
-        console.warn('⚠️ API did not return an array:', typeof data);
-        setReports([]);
-      } else {
-        // ✅ FILTRAR reports undefined/null
-        const validReports = data.filter(report => report != null);
-        console.log('✅ Valid reports:', validReports.length);
-        setReports(validReports);
-      }
-    } catch (error: any) {
-      console.error('❌ Error loading reports:', error);
-      console.error('Error message:', error?.message);
-      console.error('Error response:', error?.response?.data);
-      
-      Alert.alert(
-        'Erro', 
-        `Não foi possível carregar os relatórios.\n\nDetalhes: ${error?.message || 'Erro desconhecido'}`
-      );
+// No ficheiro: PerformanceRepairElevatorListScreen.tsx
+
+const loadReports = async () => {
+  try {
+    setLoading(true);
+    console.log('🔍 Loading reports for turbine:', turbineId);
+    
+    const data = await performanceRepairElevatorAPI.getByTurbine(turbineId) as any[];
+    console.log('📦 Reports received:', data);
+    
+    if (!data || !Array.isArray(data)) {
       setReports([]);
-    } finally {
-      setLoading(false);
+    } else {
+      // ✅ Normalizar: converter "id" para "reportId"
+      const normalizedReports: Report[] = data
+        .filter(report => report != null)
+        .map(report => ({
+          ...report,
+          reportId: report.reportId || report.id, // Usar reportId se existir, senão id
+        }));
+      
+      console.log('✅ Valid reports:', normalizedReports.length);
+      setReports(normalizedReports);
     }
-  };
+  } catch (error: any) {
+    console.error('❌ Error loading reports:', error);
+    Alert.alert('Erro', error?.message || 'Não foi possível carregar os relatórios');
+    setReports([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleDelete = async (reportId: number) => {
     Alert.alert(
@@ -190,7 +186,6 @@ export default function PerformanceRepairElevatorListScreen() {
       ) : (
         <ScrollView style={styles.scrollView}>
           {reports.map((report) => {
-            // ✅ VALIDAÇÃO EXTRA: Verificar se report existe antes de renderizar
             if (!report || !report.reportId) {
               console.warn('⚠️ Skipping invalid report:', report);
               return null;

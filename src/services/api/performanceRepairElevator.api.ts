@@ -14,48 +14,57 @@ export const performanceRepairElevatorAPI = {
   /**
    * Criar novo relatório
    */
-  create: async (data: PerformanceRepairElevatorData): Promise<PerformanceRepairElevatorResponse> => {
-    const dto: PerformanceRepairElevatorDTO = {
-      site: data.site,
-      wtgNumber: data.wtgNumber,
-      wtgType: data.wtgType,
-      yearConstruction: data.yearConstruction,
-      inspectors: data.inspectors,
-      workCompleted: data.workCompleted,
-      windturbineOperable: data.windturbineOperable,
-      performanceReport: data.performanceReport,
-      projectoId: data.projectoId,
-      turbinaId: data.turbinaId,
-      photoFileIds: data.photos
-        .filter(p => p.fileId && p.isUploaded)
-        .map(p => p.fileId!),
-    };
+/**
+ * Criar novo relatório
+ */
+create: async (data: PerformanceRepairElevatorData): Promise<PerformanceRepairElevatorResponse> => {
+  const dto: PerformanceRepairElevatorDTO = {
+    site: data.site,
+    wtgNumber: data.wtgNumber,
+    wtgType: data.wtgType,
+    yearConstruction: data.yearConstruction,
+    inspectors: data.inspectors,
+    workCompleted: data.workCompleted,
+    windturbineOperable: data.windturbineOperable,
+    performanceReport: data.performanceReport,
+    projectoId: data.projectoId,
+    turbinaId: data.turbinaId,
+    photoFileIds: data.photos
+      .filter(p => p.fileId && p.isUploaded)
+      .map(p => p.fileId!),
+  };
 
-    // Adicionar campos adicionais
-    data.additionalFields.forEach((field, index) => {
-      if (index < 3) {
-        (dto as any)[`additionalField${index + 1}`] = {
-          label: field.label,
-          value: field.value,
-        };
-      }
-    });
+  // Adicionar campos adicionais
+  data.additionalFields.forEach((field, index) => {
+    if (index < 3) {
+      (dto as any)[`additionalField${index + 1}`] = {
+        label: field.label,
+        value: field.value,
+      };
+    }
+  });
 
-    const payload = {
-      turbineId: data.turbinaId,
-      projectoId: data.projectoId,
-      reportType: 6, // Performance Report Repair Elevator
-      reportData: JSON.stringify(dto),
-      photoFileIds: dto.photoFileIds,
-    };
+  const payload = {
+    turbineId: data.turbinaId,
+    projectoId: data.projectoId,
+    reportType: 6,
+    reportData: JSON.stringify(dto),
+    photoFileIds: dto.photoFileIds,
+  };
 
-    const response = await httpClient.post(
-      `${API_CONFIG.baseMobileReportsUrl}performance-repair-elevator`,
-      payload
-    );
+  // ✅ ADICIONAR ESTES LOGS
+  const url = `${API_CONFIG.baseMobileReportsUrl}performance-repair-elevator`;
+  console.log('🔍 DEBUG CREATE:');
+  console.log('  API_CONFIG.baseMobileReportsUrl:', API_CONFIG.baseMobileReportsUrl);
+  console.log('  Full URL:', url);
+  console.log('  URL length:', url.length);
+  console.log('  Has //:', url.includes('//'));
+  console.log('  Count of /:', (url.match(/\//g) || []).length);
 
-    return response.data;
-  },
+  const response = await httpClient.post(url, payload);
+
+  return response.data;
+},
 
   /**
    * Atualizar relatório existente
@@ -128,31 +137,35 @@ export const performanceRepairElevatorAPI = {
   /**
    * Upload de foto
    */
-  uploadPhoto: async (photo: PhotoData): Promise<{ fileId: number }> => {
-    const formData = new FormData();
-    
-    formData.append('file', {
-      uri: photo.uri,
-      type: 'image/jpeg',
-      name: `photo_${Date.now()}.jpg`,
-    } as any);
+/**
+ * Upload de foto
+ */
+uploadPhoto: async (photo: PhotoData, reportUuid: string): Promise<{ fileId: number }> => {
+  const formData = new FormData();
+  
+  formData.append('file', {
+    uri: photo.uri,
+    type: 'image/jpeg',
+    name: `photo_${Date.now()}.jpg`,
+  } as any);
 
-    if (photo.description) {
-      formData.append('description', photo.description);
+  if (photo.description) {
+    formData.append('description', photo.description);
+  }
+
+  // ✅ Endpoint correto com UUID do relatório
+  const response = await httpClient.post(
+    `${API_CONFIG.baseFilesUrl}upload/${reportUuid}`,  // ✅ Usa baseFilesUrl + upload/{uuid}
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     }
+  );
 
-    const response = await httpClient.post(
-      `${API_CONFIG.baseReportsUrl}/upload-photo`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
-    );
-
-    return response.data;
-  },
+  return response.data;
+},
 
   /**
    * Eliminar relatório
