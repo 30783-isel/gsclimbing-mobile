@@ -128,24 +128,29 @@ export default function PerformanceRepairElevatorEditScreen() {
       // Modo editar - carregar relatório existente
       const report = await performanceRepairElevatorAPI.getById(reportId);
       
+      if (!report) {
+        Alert.alert('Erro', 'Relatório não encontrado');
+        router.back();
+        return;
+      }
+      
       setSite(report.site || '');
       setWtgNumber(report.wtgNumber || '');
       setWtgType(report.wtgType || '');
       setYearConstruction(report.yearConstruction || '');
       
-      // Extrair campos do relatório
-      if (report.additionalField1Label === 'Inspectors/Workers') {
-        setInspectors(report.additionalField1Text || '');
-      }
-      if (report.additionalField2Label === 'Work Completed') {
-        setWorkCompleted(report.additionalField2Text as any);
-      }
-      if (report.additionalField3Label === 'Windturbine Operable') {
-        setWindturbineOperable(report.additionalField3Text as any);
-      }
-      if (report.additionalField4Label === 'Performance Report') {
-        setPerformanceReport(report.additionalField4Text || '');
-      }
+      // Extrair campos do relatório (usando additionalField1-7)
+      // Os campos estão mapeados assim:
+      // Field 1: Inspectors
+      // Field 2: Work Completed  
+      // Field 3: Windturbine Operable
+      // Field 4: Performance Report
+      // Fields 5-7: Campos extras do utilizador
+      
+      setInspectors(report.additionalField1Text || '');
+      setWorkCompleted((report.additionalField2Text || '') as any);
+      setWindturbineOperable((report.additionalField3Text || '') as any);
+      setPerformanceReport(report.additionalField4Text || '');
 
       // Carregar fotos
       const existingPhotos = await performanceRepairElevatorAPI.getPhotos(reportId);
@@ -191,9 +196,10 @@ export default function PerformanceRepairElevatorEditScreen() {
       setAdditionalFields(fields);
 
       setLoading(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading report:', error);
-      Alert.alert('Erro', 'Não foi possível carregar o relatório');
+      Alert.alert('Erro', error?.message || 'Não foi possível carregar o relatório');
+      setLoading(false);
       router.back();
     }
   };

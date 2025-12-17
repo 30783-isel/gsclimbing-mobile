@@ -349,6 +349,17 @@ export default function TurbineDetailsScreen() {
     });
   };
 
+  const handleViewPerformanceReports = () => {
+    router.push({
+      pathname: `${basePath}/reports/performance-repair-elevator/list` as any,
+      params: {
+        turbineId: turbineId,
+        turbineName: turbine?.name || 'Turbina',
+        projectName: project?.name || 'Projeto',
+      },
+    });
+  };
+
   const reportAvailability = turbine ? [
     { type: ReportType.DEFECT_INSPECTION, available: turbine.defectsInspectionReport, 
       name: REPORT_TYPE_NAMES[ReportType.DEFECT_INSPECTION], icon: 'alert-circle-outline', color: '#F44336' },
@@ -454,6 +465,15 @@ export default function TurbineDetailsScreen() {
           style={styles.viewReportsButton}>
           Ver Relatórios Defect Inspection
         </Button>
+
+        <Button 
+          mode="contained" 
+          icon="elevator" 
+          onPress={handleViewPerformanceReports}
+          style={styles.viewReportsButton}
+        >
+  Ver Relatórios Performance Repair Elevator
+</Button>
 
         <View style={styles.section}>
           <Text variant="titleMedium" style={styles.sectionTitle}>Criar Novo Relatório</Text>
