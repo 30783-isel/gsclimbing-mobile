@@ -127,12 +127,11 @@ create: async (data: PerformanceRepairElevatorData): Promise<PerformanceRepairEl
   /**
    * Obter fotos do relatório
    */
-  getPhotos: async (reportId: number): Promise<any[]> => {
-    const response = await httpClient.get(
-      `${API_CONFIG.baseReportsUrl}/${reportId}/photos`
-    );
-    return response.data;
-  },
+    getPhotos: async (reportId: number): Promise<any[]> => {
+        const endpoint = `${API_CONFIG.baseMobileReportsUrl}performance-repair-elevator/${reportId}/photos`;
+        const response = await httpClient.get(endpoint);
+        return response.data;
+    },
 
   /**
    * Upload de foto
