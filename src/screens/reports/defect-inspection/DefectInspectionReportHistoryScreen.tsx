@@ -39,6 +39,7 @@ export default function DefectInspectionReportHistoryScreen() {
       setError(null);
 
       const data = await reportHistoryAPI.getHistory(Number(reportId));
+    
       setHistory(data);
 
       console.log(`✅ Loaded ${data.length} history entries`);

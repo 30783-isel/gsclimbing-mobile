@@ -1,0 +1,3 @@
+import PerformanceRepairElevatorEditScreen from '@/screens/reports/performance-repair-elevator/PerformanceRepairElevatorEditScreen';
+
+export default PerformanceRepairElevatorEditScreen;

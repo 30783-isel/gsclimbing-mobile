@@ -315,7 +315,17 @@ export default function TurbineDetailsScreen() {
           turbineName: turbine?.name || 'Turbina',
         },
       });
-    } else {
+    } else if (reportType === ReportType.PERFORMANCE_REPAIR_ELEVATOR) {
+        router.push({
+          pathname: '/reports/performance-repair-elevator/create',
+          params: {
+          projectoId: id,
+          turbinaId: turbineId,
+          projectName: project?.name || 'Projeto',
+          turbineName: turbine?.name || 'Turbina',
+          },
+        });
+    }else {
       // Outros tipos de relatório requerem conexão
       if (!isOnline) {
         Alert.alert('Modo Offline', 'Este tipo de relatório requer conexão à internet.');
