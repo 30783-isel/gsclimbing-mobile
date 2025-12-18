@@ -106,8 +106,9 @@ create: async (data: PerformanceRepairElevatorData): Promise<PerformanceRepairEl
       photoFileIds: dto.photoFileIds,
     };
 
+    const endpoint = `${API_CONFIG.baseMobileReportsUrl}performance-repair-elevator/${reportId}`;
     const response = await httpClient.put(
-      `${API_CONFIG.baseMobileReportsUrl}performance-repair-elevator/${reportId}`,
+      endpoint,
       payload
     );
 
@@ -129,6 +130,7 @@ create: async (data: PerformanceRepairElevatorData): Promise<PerformanceRepairEl
    */
     getPhotos: async (reportId: number): Promise<any[]> => {
         const endpoint = `${API_CONFIG.baseMobileReportsUrl}performance-repair-elevator/${reportId}/photos`;
+        console.log('🔍 DEBUG GET PHOTOS:' + endpoint);
         const response = await httpClient.get(endpoint);
         return response.data;
     },
@@ -153,8 +155,10 @@ uploadPhoto: async (photo: PhotoData, reportUuid: string): Promise<{ fileId: num
   }
 
   // ✅ Endpoint correto com UUID do relatório
+  const endpoint = `${API_CONFIG.baseFilesUrl}upload/${reportUuid}`;
+  console.log('🔍 DEBUG UPDATE PHOTOS:' + endpoint);
   const response = await httpClient.post(
-    `${API_CONFIG.baseFilesUrl}upload/${reportUuid}`,  // ✅ Usa baseFilesUrl + upload/{uuid}
+    endpoint,  // ✅ Usa baseFilesUrl + upload/{uuid}
     formData,
     {
       headers: {
@@ -178,8 +182,9 @@ uploadPhoto: async (photo: PhotoData, reportUuid: string): Promise<{ fileId: num
  * Obter todos os relatórios de uma turbina
  */
 getByTurbine: async (turbineId: number): Promise<Report[]> => {
+  const endpoint = `${API_CONFIG.baseMobileReportsUrl}performance-repair-elevator/turbine/${turbineId}`;
   const response = await httpClient.get(
-    `${API_CONFIG.baseMobileReportsUrl}performance-repair-elevator/turbine/${turbineId}`
+    endpoint
   );
   return response.data;
 },

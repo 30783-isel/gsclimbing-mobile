@@ -44,7 +44,7 @@ import type {
   PhotoData,
   AdditionalField,
 } from '@/types/performanceRepairElevator.types';
-
+import { API_CONFIG } from '@/constants/api';
 export default function PerformanceRepairElevatorEditScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -108,7 +108,7 @@ export default function PerformanceRepairElevatorEditScreen() {
   };
 
 
-  const loadData = async () => {
+const loadData = async () => {
   console.log('🔍 loadData called with reportId:', reportId);
   
   try {
@@ -157,12 +157,6 @@ export default function PerformanceRepairElevatorEditScreen() {
     setWorkCompleted((report.workCompleted || '') as any);  // ✅ Campo específico
     setWindturbineOperable((report.turbineOperable || '') as any); // ✅ Campo específico
     setPerformanceReport(report.performanceReport || '');   // ✅ Campo específico
-    
-    // Outros campos específicos (se necessário)
-    // setReportNumber(report.reportNumber || '');
-    // setStatementOfwork(report.statementOfwork || '');
-    // setPlaceDate(report.placeDate || '');
-    // setResponsibleTechnician(report.responsibleTechnician || '');
 
     // Carregar campos adicionais genéricos (se existirem)
     const additionalFieldsData: AdditionalField[] = [];
@@ -175,21 +169,45 @@ export default function PerformanceRepairElevatorEditScreen() {
     }
     setAdditionalFields(additionalFieldsData);
 
-    // Carregar fotos
+    // ✅ CARREGAR FOTOS - VERSÃO CORRIGIDA
     console.log('📸 Loading photos...');
     try {
       const existingPhotos = await performanceRepairElevatorAPI.getPhotos(reportId);
       console.log('📸 Photos received:', existingPhotos?.length || 0);
+      console.log('📸 Photos data:', JSON.stringify(existingPhotos, null, 2));
       
+      // ✅ CORREÇÃO: Criar array de 4 posições e preencher com fotos existentes
       const initialPhotos: PhotoData[] = Array.from({ length: 4 }, (_, i) => {
-        const existingPhoto = existingPhotos?.find(
-          (p: any) => p.position === i + 1
-        );
+        // ✅ Pegar a foto do índice atual (se existir) - SEM usar .find() com position
+        const existingPhoto = existingPhotos?.[i];
         
         if (existingPhoto) {
+          // ✅ Construir URL completo para a foto
+          // O backend retorna: "/api/reports/mobile/files/download/{hash}"
+          // Precisamos adicionar o baseUrl
+          const downloadUrl = existingPhoto.downloadUrl || '';
+          let fullPhotoUrl = downloadUrl;
+          
+          // Se não começar com http, adicionar o baseUrl
+          if (downloadUrl && !downloadUrl.startsWith('http')) {
+            // Remover barra inicial se existir para evitar //
+            const cleanUrl = downloadUrl.startsWith('/') ? downloadUrl.substring(1) : downloadUrl;
+            const baseUrl = API_CONFIG.baseUrl.endsWith('/') 
+              ? API_CONFIG.baseUrl.slice(0, -1) 
+              : API_CONFIG.baseUrl;
+            fullPhotoUrl = `${baseUrl}/${cleanUrl}`;
+          }
+          
+          console.log(`📸 Photo ${i + 1}:`, {
+            fileId: existingPhoto.fileId,
+            hash: existingPhoto.hash,
+            originalUrl: downloadUrl,
+            fullUrl: fullPhotoUrl
+          });
+          
           return {
             id: String(existingPhoto.fileId),
-            uri: existingPhoto.downloadUrl || '',
+            uri: fullPhotoUrl,
             pageNumber: 4,
             position: i + 1,
             timestamp: Date.now(),
@@ -198,6 +216,7 @@ export default function PerformanceRepairElevatorEditScreen() {
             description: existingPhoto.description || '',
           };
         } else {
+          // Slot vazio
           return {
             id: `photo-${i}`,
             uri: '',
@@ -211,7 +230,11 @@ export default function PerformanceRepairElevatorEditScreen() {
       });
       
       setPhotos(initialPhotos);
-      console.log('✅ Photos loaded');
+      console.log('✅ Photos loaded:', initialPhotos.map(p => ({ 
+        position: p.position, 
+        hasUri: !!p.uri,
+        fileId: p.fileId 
+      })));
       
     } catch (photoError) {
       console.error('⚠️ Error loading photos:', photoError);
