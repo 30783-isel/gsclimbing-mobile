@@ -109,105 +109,42 @@ export default function PerformanceRepairElevatorEditScreen() {
 
 
 const loadData = async () => {
-  console.log('🔍 loadData called with reportId:', reportId);
-  
-  try {
-    // Modo criar novo
-    if (reportId === 0) {
-      console.log('✅ Modo CREATE - inicializando fotos vazias');
-      // Inicializar fotos vazias
-      const emptyPhotos: PhotoData[] = Array.from({ length: 4 }, (_, i) => ({
-        id: `photo-${i}`,
-        uri: '',
-        pageNumber: 4,
-        position: i + 1,
-        timestamp: Date.now(),
-        isUploaded: false,
-        description: '',
-      }));
-      setPhotos(emptyPhotos);
-      setLoading(false);
-      console.log('✅ CREATE mode initialized');
-      return;
-    }
+// ============================================================================
+// CORREÇÃO FINAL - loadData() - Parte das Fotos
+// ============================================================================
+// Substitui APENAS a parte do carregamento de fotos no teu loadData()
 
-    // Modo editar - carregar relatório existente
-    console.log('📥 Fetching report from API...');
-    const report = await performanceRepairElevatorAPI.getById(reportId);
-    console.log('📦 Report received:', report);
-    
-    if (!report) {
-      console.error('❌ Report is null/undefined');
-      Alert.alert('Erro', 'Relatório não encontrado');
-      setLoading(false);
-      router.back();
-      return;
-    }
-    
-    console.log('📝 Setting basic fields...');
-    setSite(report.site || '');
-    setWtgNumber(report.wtgNumber || '');
-    setWtgType(report.wtgType || '');
-    setYearConstruction(report.yearConstruction || '');
-    setReportUuid(report.uuid || '');
-    
-    // ✅ CORREÇÃO: Ler dos campos ESPECÍFICOS da entidade PerformanceReportRepairElevator
-    console.log('📝 Setting specific fields...');
-    setInspectors(report.inpectorsWorkers || '');           // ✅ Campo específico
-    setWorkCompleted((report.workCompleted || '') as any);  // ✅ Campo específico
-    setWindturbineOperable((report.turbineOperable || '') as any); // ✅ Campo específico
-    setPerformanceReport(report.performanceReport || '');   // ✅ Campo específico
-
-    // Carregar campos adicionais genéricos (se existirem)
-    const additionalFieldsData: AdditionalField[] = [];
-    for (let i = 1; i <= 7; i++) {
-      const label = report[`additionalField${i}Label`];
-      const text = report[`additionalField${i}Text`];
-      if (label && text) {
-        additionalFieldsData.push({ label, value: text });
-      }
-    }
-    setAdditionalFields(additionalFieldsData);
-
-    // ✅ CARREGAR FOTOS - VERSÃO CORRIGIDA
+    // ✅ CARREGAR FOTOS - VERSÃO CORRIGIDA (igual ao DefectInspection)
     console.log('📸 Loading photos...');
     try {
       const existingPhotos = await performanceRepairElevatorAPI.getPhotos(reportId);
       console.log('📸 Photos received:', existingPhotos?.length || 0);
-      console.log('📸 Photos data:', JSON.stringify(existingPhotos, null, 2));
       
-      // ✅ CORREÇÃO: Criar array de 4 posições e preencher com fotos existentes
       const initialPhotos: PhotoData[] = Array.from({ length: 4 }, (_, i) => {
-        // ✅ Pegar a foto do índice atual (se existir) - SEM usar .find() com position
         const existingPhoto = existingPhotos?.[i];
         
         if (existingPhoto) {
-          // ✅ Construir URL completo para a foto
-          // O backend retorna: "/api/reports/mobile/files/download/{hash}"
-          // Precisamos adicionar o baseUrl
-          const downloadUrl = existingPhoto.downloadUrl || '';
-          let fullPhotoUrl = downloadUrl;
-          
-          // Se não começar com http, adicionar o baseUrl
-          if (downloadUrl && !downloadUrl.startsWith('http')) {
-            // Remover barra inicial se existir para evitar //
-            const cleanUrl = downloadUrl.startsWith('/') ? downloadUrl.substring(1) : downloadUrl;
-            const baseUrl = API_CONFIG.baseUrl.endsWith('/') 
-              ? API_CONFIG.baseUrl.slice(0, -1) 
-              : API_CONFIG.baseUrl;
-            fullPhotoUrl = `${baseUrl}/${cleanUrl}`;
-          }
+          // ✅ CORREÇÃO: Seguir EXATAMENTE o padrão do DefectInspection
+          const baseUrlClean = API_CONFIG.baseUrl.replace('/api/', '');
+          const correctPath = existingPhoto.downloadUrl.replace(
+            '/api/reports/files/download/',
+            '/api/reports/mobile/files/download/'
+          );
+          const fullImageUrl = correctPath.startsWith('http')
+            ? correctPath
+            : `${baseUrlClean}${correctPath}`;
           
           console.log(`📸 Photo ${i + 1}:`, {
             fileId: existingPhoto.fileId,
             hash: existingPhoto.hash,
-            originalUrl: downloadUrl,
-            fullUrl: fullPhotoUrl
+            originalUrl: existingPhoto.downloadUrl,
+            correctedPath: correctPath,
+            fullUrl: fullImageUrl
           });
           
           return {
             id: String(existingPhoto.fileId),
-            uri: fullPhotoUrl,
+            uri: fullImageUrl,
             pageNumber: 4,
             position: i + 1,
             timestamp: Date.now(),
@@ -216,7 +153,6 @@ const loadData = async () => {
             description: existingPhoto.description || '',
           };
         } else {
-          // Slot vazio
           return {
             id: `photo-${i}`,
             uri: '',
@@ -230,11 +166,7 @@ const loadData = async () => {
       });
       
       setPhotos(initialPhotos);
-      console.log('✅ Photos loaded:', initialPhotos.map(p => ({ 
-        position: p.position, 
-        hasUri: !!p.uri,
-        fileId: p.fileId 
-      })));
+      console.log('✅ Photos loaded');
       
     } catch (photoError) {
       console.error('⚠️ Error loading photos:', photoError);
@@ -250,16 +182,6 @@ const loadData = async () => {
       }));
       setPhotos(emptyPhotos);
     }
-    
-    setLoading(false);
-    console.log('✅ Data loaded successfully');
-    
-  } catch (error) {
-    console.error('❌ Error in loadData:', error);
-    Alert.alert('Erro', 'Não foi possível carregar o relatório');
-    setLoading(false);
-    router.back();
-  }
 };
 
   // ====================================================================
