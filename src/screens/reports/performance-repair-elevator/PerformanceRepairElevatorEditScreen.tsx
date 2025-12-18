@@ -109,12 +109,65 @@ export default function PerformanceRepairElevatorEditScreen() {
 
 
 const loadData = async () => {
-// ============================================================================
-// CORREÇÃO FINAL - loadData() - Parte das Fotos
-// ============================================================================
-// Substitui APENAS a parte do carregamento de fotos no teu loadData()
+  console.log('🔍 loadData called with reportId:', reportId);
+  
+  try {
+    // Modo criar novo
+    if (reportId === 0) {
+      console.log('✅ Modo CREATE - inicializando fotos vazias');
+      const emptyPhotos: PhotoData[] = Array.from({ length: 4 }, (_, i) => ({
+        id: `photo-${i}`,
+        uri: '',
+        pageNumber: 4,
+        position: i + 1,
+        timestamp: Date.now(),
+        isUploaded: false,
+        description: '',
+      }));
+      setPhotos(emptyPhotos);
+      setLoading(false);
+      console.log('✅ CREATE mode initialized');
+      return;
+    }
 
-    // ✅ CARREGAR FOTOS - VERSÃO CORRIGIDA (igual ao DefectInspection)
+    // Modo editar - carregar relatório existente
+    console.log('📥 Fetching report from API...');
+    const report = await performanceRepairElevatorAPI.getById(reportId);
+    console.log('📦 Report received:', report);
+    
+    if (!report) {
+      console.error('❌ Report is null/undefined');
+      Alert.alert('Erro', 'Relatório não encontrado');
+      setLoading(false);
+      router.back();
+      return;
+    }
+    
+    console.log('📝 Setting basic fields...');
+    setSite(report.site || '');
+    setWtgNumber(report.wtgNumber || '');
+    setWtgType(report.wtgType || '');
+    setYearConstruction(report.yearConstruction || '');
+    setReportUuid(report.uuid || '');
+    
+    console.log('📝 Setting specific fields...');
+    setInspectors(report.inpectorsWorkers || '');
+    setWorkCompleted((report.workCompleted || '') as any);
+    setWindturbineOperable((report.turbineOperable || '') as any);
+    setPerformanceReport(report.performanceReport || '');
+
+    // Carregar campos adicionais
+    const additionalFieldsData: AdditionalField[] = [];
+    for (let i = 1; i <= 7; i++) {
+      const label = report[`additionalField${i}Label`];
+      const text = report[`additionalField${i}Text`];
+      if (label && text) {
+        additionalFieldsData.push({ label, value: text });
+      }
+    }
+    setAdditionalFields(additionalFieldsData);
+
+    // ✅ CARREGAR FOTOS - VERSÃO CORRIGIDA E COMPLETA
     console.log('📸 Loading photos...');
     try {
       const existingPhotos = await performanceRepairElevatorAPI.getPhotos(reportId);
@@ -124,7 +177,7 @@ const loadData = async () => {
         const existingPhoto = existingPhotos?.[i];
         
         if (existingPhoto) {
-          // ✅ CORREÇÃO: Seguir EXATAMENTE o padrão do DefectInspection
+          // ✅ Seguir o padrão do DefectInspection
           const baseUrlClean = API_CONFIG.baseUrl.replace('/api/', '');
           const correctPath = existingPhoto.downloadUrl.replace(
             '/api/reports/files/download/',
@@ -136,9 +189,6 @@ const loadData = async () => {
           
           console.log(`📸 Photo ${i + 1}:`, {
             fileId: existingPhoto.fileId,
-            hash: existingPhoto.hash,
-            originalUrl: existingPhoto.downloadUrl,
-            correctedPath: correctPath,
             fullUrl: fullImageUrl
           });
           
@@ -170,7 +220,6 @@ const loadData = async () => {
       
     } catch (photoError) {
       console.error('⚠️ Error loading photos:', photoError);
-      // Inicializar fotos vazias se houver erro
       const emptyPhotos: PhotoData[] = Array.from({ length: 4 }, (_, i) => ({
         id: `photo-${i}`,
         uri: '',
@@ -182,6 +231,16 @@ const loadData = async () => {
       }));
       setPhotos(emptyPhotos);
     }
+    
+    setLoading(false);
+    console.log('✅ Data loaded successfully');
+    
+  } catch (error) {
+    console.error('❌ Error in loadData:', error);
+    Alert.alert('Erro', 'Não foi possível carregar o relatório');
+    setLoading(false);
+    router.back();
+  }
 };
 
   // ====================================================================
