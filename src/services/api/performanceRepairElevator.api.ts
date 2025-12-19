@@ -50,7 +50,7 @@ create: async (data: PerformanceRepairElevatorData): Promise<PerformanceRepairEl
     projectoId: data.projectoId,
     reportType: 6,
     reportData: JSON.stringify(dto),
-    photoFileIds: dto.photoFileIds,
+    photoIds: dto.photoFileIds, 
   };
 
   // ✅ ADICIONAR ESTES LOGS
@@ -104,7 +104,7 @@ create: async (data: PerformanceRepairElevatorData): Promise<PerformanceRepairEl
       projectoId: data.projectoId,
       reportType: 6,
       reportData: JSON.stringify(dto),
-      photoFileIds: dto.photoFileIds,
+      photoIds: dto.photoFileIds, 
     };
 
     const endpoint = `${API_CONFIG.baseMobileReportsUrl}performance-repair-elevator/${reportId}`;
