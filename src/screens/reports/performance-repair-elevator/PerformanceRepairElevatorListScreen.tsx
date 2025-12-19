@@ -127,16 +127,19 @@ export default function PerformanceRepairElevatorListScreen() {
     );
   };
 
-  // ✅ Handler para ver histórico
+  
+
   const handleHistory = (reportId: number) => {
-    router.push({
-      pathname: `${basePath}/reports/performance-repair-elevator/${reportId}/history` as any,
-      params: {
-        reportId: reportId.toString(),
-        reportTitle: `Relatório #${reportId}`,
-      },
-    });
-  };
+  console.log('📜 Opening history for report:', reportId);
+  router.push({
+    pathname: `${basePath}/reports/performance-repair-elevator/history` as any,
+    params: {
+      reportId: reportId.toString(),
+      projectName: params.projectName,
+      turbineName: params.turbineName,
+    },
+  });
+};
 
   // Handler para criar novo
   const handleCreateNew = () => {

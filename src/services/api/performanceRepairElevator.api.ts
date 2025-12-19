@@ -9,6 +9,7 @@ import type {
   PhotoData,
 } from '@/types/performanceRepairElevator.types';
 import { Report } from '@/types';
+import type { HistoryEntry } from '@/types/history.types';
 
 export const performanceRepairElevatorAPI = {
   /**
@@ -188,4 +189,26 @@ getByTurbine: async (turbineId: number): Promise<Report[]> => {
   );
   return response.data;
 },
+
+/**
+ * Obter histórico de alterações de um Performance Report
+ * @param reportId - ID do relatório
+ * @returns Lista de entradas de histórico
+ */
+getHistory: async (reportId: number): Promise<HistoryEntry[]> => {
+  try {
+    console.log(`📜 Fetching history for performance report ${reportId}...`);
+    
+    const response = await httpClient.get(
+      `${API_CONFIG.baseMobileReportsUrl}performance-repair-elevator/${reportId}/history`
+    );
+
+    console.log(`✅ Found ${response.data.length} history entries`);
+    return response.data;
+  } catch (error: any) {
+    console.error(`❌ Error fetching history for report ${reportId}:`, error);
+    throw error;
+  }
+},
+
 };
