@@ -127,12 +127,12 @@ export default function PerformanceRepairElevatorListScreen() {
     );
   };
 
-  
 
-  const handleHistory = (reportId: number) => {
+
+const handleHistory = (reportId: number) => {
   console.log('📜 Opening history for report:', reportId);
   router.push({
-    pathname: `${basePath}/reports/performance-repair-elevator/history` as any,
+    pathname: `${basePath}/reports/performance-repair-elevator/${reportId}/history` as any,
     params: {
       reportId: reportId.toString(),
       projectName: params.projectName,
