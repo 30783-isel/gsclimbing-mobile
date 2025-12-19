@@ -2,6 +2,7 @@
  * PerformanceRepairElevatorListScreen
  * 
  * Ecrã de lista dos Performance Report Repair Elevator
+ * ✅ ATUALIZADO com menu de 3 pontos (editar, histórico, eliminar)
  */
 
 import React, { useState, useEffect } from 'react';
@@ -52,39 +53,50 @@ export default function PerformanceRepairElevatorListScreen() {
     setIsOnline(state.isConnected ?? false);
   };
 
-// No ficheiro: PerformanceRepairElevatorListScreen.tsx
-
-const loadReports = async () => {
-  try {
-    setLoading(true);
-    console.log('🔍 Loading reports for turbine:', turbineId);
-    
-    const data = await performanceRepairElevatorAPI.getByTurbine(turbineId) as any[];
-    console.log('📦 Reports received:', data);
-    
-    if (!data || !Array.isArray(data)) {
-      setReports([]);
-    } else {
-      // ✅ Normalizar: converter "id" para "reportId"
-      const normalizedReports: Report[] = data
-        .filter(report => report != null)
-        .map(report => ({
-          ...report,
-          reportId: report.reportId || report.id, // Usar reportId se existir, senão id
-        }));
+  const loadReports = async () => {
+    try {
+      setLoading(true);
+      console.log('🔍 Loading reports for turbine:', turbineId);
       
-      console.log('✅ Valid reports:', normalizedReports.length);
-      setReports(normalizedReports);
+      const data = await performanceRepairElevatorAPI.getByTurbine(turbineId) as any[];
+      console.log('📦 Reports received:', data);
+      
+      if (!data || !Array.isArray(data)) {
+        setReports([]);
+      } else {
+        // ✅ Normalizar: converter "id" para "reportId"
+        const normalizedReports: Report[] = data
+          .filter(report => report != null)
+          .map(report => ({
+            ...report,
+            reportId: report.reportId || report.id,
+          }));
+        
+        console.log('✅ Valid reports:', normalizedReports.length);
+        setReports(normalizedReports);
+      }
+    } catch (error: any) {
+      console.error('❌ Error loading reports:', error);
+      Alert.alert('Erro', error?.message || 'Não foi possível carregar os relatórios');
+      setReports([]);
+    } finally {
+      setLoading(false);
     }
-  } catch (error: any) {
-    console.error('❌ Error loading reports:', error);
-    Alert.alert('Erro', error?.message || 'Não foi possível carregar os relatórios');
-    setReports([]);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
+  // ✅ Handler para editar
+  const handleEditReport = (report: Report) => {
+    router.push({
+      pathname: `${basePath}/reports/performance-repair-elevator/edit` as any,
+      params: {
+        reportId: report.reportId.toString(),
+        turbineId: turbineId.toString(),
+        projectId: report.projectoId?.toString() || '0',
+      },
+    });
+  };
+
+  // ✅ Handler para eliminar
   const handleDelete = async (reportId: number) => {
     Alert.alert(
       'Eliminar Relatório',
@@ -95,11 +107,18 @@ const loadReports = async () => {
           text: 'Eliminar',
           style: 'destructive',
           onPress: async () => {
+            if (!isOnline) {
+              Alert.alert('Modo Offline', 'Não é possível eliminar relatórios quando offline.');
+              return;
+            }
+            
             try {
+              console.log('🗑️ Deleting report:', reportId);
               await performanceRepairElevatorAPI.delete(reportId);
-              await loadReports();
               Alert.alert('Sucesso', 'Relatório eliminado com sucesso');
+              await loadReports();
             } catch (error: any) {
+              console.error('❌ Error deleting report:', error);
               Alert.alert('Erro', error?.message || 'Não foi possível eliminar o relatório');
             }
           },
@@ -108,33 +127,25 @@ const loadReports = async () => {
     );
   };
 
+  // ✅ Handler para ver histórico
   const handleHistory = (reportId: number) => {
-    Alert.alert('Histórico', `Ver histórico do relatório ${reportId}`);
-    // TODO: Implementar ecrã de histórico
-  };
-
-  const handleCreateNew = () => {
-    console.log('➕ Creating new report for turbine:', turbineId);
     router.push({
-      pathname: `${basePath}/reports/performance-repair-elevator/edit` as any,
+      pathname: `${basePath}/reports/performance-repair-elevator/${reportId}/history` as any,
       params: {
-        reportId: '0',
-        turbineId: turbineId.toString(),
-        projectName: params.projectName,
-        turbineName: params.turbineName,
+        reportId: reportId.toString(),
+        reportTitle: `Relatório #${reportId}`,
       },
     });
   };
 
-  const handleEditReport = (report: Report) => {
-    console.log('✏️ Editing report:', report.reportId);
+  // Handler para criar novo
+  const handleCreateNew = () => {
     router.push({
-      pathname: `${basePath}/reports/performance-repair-elevator/edit` as any,
+      pathname: `${basePath}/reports/performance-repair-elevator/create` as any,
       params: {
-        reportId: report.reportId.toString(),
         turbineId: turbineId.toString(),
-        projectName: params.projectName,
         turbineName: params.turbineName,
+        projectName: params.projectName,
       },
     });
   };
@@ -160,19 +171,26 @@ const loadReports = async () => {
         />
         <View style={styles.headerCenter}>
           <Text variant="titleMedium" style={styles.headerTitle}>
-            Performance Reports
+            Performance Repair Elevator
           </Text>
-          <Text variant="bodySmall" style={styles.headerSubtitle}>
-            {params.projectName} • {params.turbineName}
-          </Text>
+          {params.turbineName && (
+            <Text variant="bodySmall" style={styles.headerSubtitle}>
+              {params.turbineName}
+            </Text>
+          )}
         </View>
-        <View style={{ width: 48 }} />
+        <IconButton
+          icon="refresh"
+          iconColor={colors.white}
+          size={24}
+          onPress={loadReports}
+        />
       </View>
 
-      {/* Lista */}
+      {/* Lista de relatórios */}
       {reports.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <IconButton icon="elevator" size={64} iconColor={colors.textSecondary} />
+          <IconButton icon="file-document-outline" size={64} iconColor={colors.textSecondary} />
           <Text variant="titleMedium" style={styles.emptyTitle}>
             Sem relatórios
           </Text>

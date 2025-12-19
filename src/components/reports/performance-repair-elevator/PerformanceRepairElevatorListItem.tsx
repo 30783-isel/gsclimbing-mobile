@@ -1,239 +1,158 @@
-/**
- * PerformanceRepairElevatorListItem
- * 
- * Componente para mostrar um item de Performance Report na lista
- */
+// src/components/reports/performance-repair-elevator/PerformanceRepairElevatorListItem.tsx
 
-import React from 'react';
+import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Card, Chip, IconButton } from 'react-native-paper';
+import { Card, Text, Chip, IconButton, Menu, Divider } from 'react-native-paper';
 import { colors, spacing } from '@/constants/theme';
 import type { Report } from '@/types/report.types';
 
 interface PerformanceRepairElevatorListItemProps {
   report: Report;
   onPress: () => void;
-  onDelete?: () => void;
-  onHistory?: () => void;
+  onDelete: () => void;
+  onHistory: () => void;
 }
 
-export default function PerformanceRepairElevatorListItem({
+const PerformanceRepairElevatorListItem: React.FC<PerformanceRepairElevatorListItemProps> = ({
   report,
   onPress,
   onDelete,
   onHistory,
-}: PerformanceRepairElevatorListItemProps) {
-  // ✅ VALIDAÇÃO: Se report não existe, não renderizar nada
-  if (!report) {
-    console.error('PerformanceRepairElevatorListItem: report is undefined');
-    return null;
-  }
+}) => {
+  const [menuVisible, setMenuVisible] = useState(false);
 
-  // Formatar data
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'N/A';
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('pt-PT', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      });
-    } catch (error) {
-      return 'N/A';
-    }
-  };
-
-  // Status do relatório
-  const getStatusChip = () => {
-    if (report?.locked === 'Y') {
-      return (
-        <Chip
-          icon="lock"
-          mode="flat"
-          style={styles.chipLocked}
-          textStyle={styles.chipText}
-        >
-          Bloqueado
-        </Chip>
-      );
-    }
-
-    if (report?.permission2Edit === 'N') {
-      return (
-        <Chip
-          icon="lock-open-variant"
-          mode="flat"
-          style={styles.chipReadOnly}
-          textStyle={styles.chipText}
-        >
-          Só Leitura
-        </Chip>
-      );
-    }
-
-    return (
-      <Chip
-        icon="pencil"
-        mode="flat"
-        style={styles.chipEditable}
-        textStyle={styles.chipText}
-      >
-        Editável
-      </Chip>
-    );
-  };
+  const toggleMenu = () => setMenuVisible(!menuVisible);
 
   return (
     <Card style={styles.card} onPress={onPress}>
       <Card.Content>
-        {/* Header */}
-        <View style={styles.header}>
+        {/* Header com título e menu */}
+        <View style={styles.cardHeader}>
           <View style={styles.headerLeft}>
-            <Text variant="titleMedium" style={styles.title}>
-              {report?.site || 'Sem site'}
-            </Text>
-            <Text variant="bodyMedium" style={styles.subtitle}>
-              WTG: {report?.wtgNumber || 'N/A'}
-            </Text>
-          </View>
-          <View style={styles.headerRight}>{getStatusChip()}</View>
-        </View>
-
-        {/* Detalhes */}
-        <View style={styles.details}>
-          <View style={styles.detailRow}>
-            <Text variant="bodySmall" style={styles.detailLabel}>
-              Criado:
-            </Text>
-            <Text variant="bodySmall" style={styles.detailValue}>
-              {formatDate(report?.createDate || '')}
+            <Text variant="titleMedium" style={styles.reportTitle}>
+              Relatório #{report.reportId}
             </Text>
           </View>
 
-          {report?.modifiedDate && report?.modifiedDate !== report?.createDate && (
-            <View style={styles.detailRow}>
-              <Text variant="bodySmall" style={styles.detailLabel}>
-                Modificado:
-              </Text>
-              <Text variant="bodySmall" style={styles.detailValue}>
-                {formatDate(report?.modifiedDate)}
-              </Text>
-            </View>
-          )}
+          {/* Menu de três pontinhos */}
+          <Menu
+            visible={menuVisible}
+            onDismiss={toggleMenu}
+            anchor={
+              <IconButton
+                icon="dots-vertical"
+                size={20}
+                onPress={toggleMenu}
+              />
+            }
+          >
+            <Menu.Item
+              onPress={() => {
+                toggleMenu();
+                onPress();
+              }}
+              leadingIcon="pencil"
+              title="Editar"
+            />
 
-          {report?.isOffline && (
-            <View style={styles.detailRow}>
-              <Chip
-                icon="wifi-off"
-                mode="flat"
-                style={styles.chipOffline}
-                textStyle={styles.chipTextSmall}
-              >
-                Offline
-              </Chip>
-            </View>
-          )}
+            <Menu.Item
+              onPress={() => {
+                toggleMenu();
+                onHistory();
+              }}
+              leadingIcon="history"
+              title="Ver Histórico"
+            />
+
+            <Divider />
+
+            <Menu.Item
+              onPress={() => {
+                toggleMenu();
+                onDelete();
+              }}
+              leadingIcon="delete"
+              title="Eliminar"
+              titleStyle={{ color: colors.error }}
+            />
+          </Menu>
         </View>
 
-        {/* Ações */}
-        <View style={styles.actions}>
-          {onHistory && (
-            <IconButton
-              icon="history"
-              size={20}
-              onPress={onHistory}
-              style={styles.actionButton}
-            />
-          )}
-          {onDelete && report?.permission2Edit === 'Y' && (
-            <IconButton
-              icon="delete"
-              size={20}
-              onPress={onDelete}
-              iconColor={colors.error}
-              style={styles.actionButton}
-            />
-          )}
+        {/* Data de criação */}
+        <Text variant="bodySmall" style={styles.reportDate}>
+          {new Date(report.createDate).toLocaleDateString('pt-PT', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </Text>
+
+        {/* Chips com informações */}
+        <View style={styles.chipContainer}>
+          <Chip icon="map-marker" compact style={styles.chip}>
+            {report.site || 'Sem site'}
+          </Chip>
+          <Chip icon="wind-turbine" compact style={styles.chip}>
+            {report.wtgNumber || 'N/A'}
+          </Chip>
+          <Chip icon="cog" compact style={styles.chip}>
+            {report.wtgNumber || 'N/A'}
+          </Chip>
         </View>
+
+        {/* Status badges se houver */}
+        {report.locked === 'Y' && (
+          <Chip
+            icon="lock"
+            compact
+            style={[styles.statusChip, { backgroundColor: colors.error + '20' }]}
+            textStyle={{ color: colors.error }}
+          >
+            Bloqueado
+          </Chip>
+        )}
       </Card.Content>
     </Card>
   );
-}
+};
 
 const styles = StyleSheet.create({
   card: {
     marginBottom: spacing.md,
     backgroundColor: colors.white,
-    elevation: 2,
   },
-  header: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.sm,
+    alignItems: 'center',
+    marginBottom: spacing.xs,
   },
   headerLeft: {
     flex: 1,
-    marginRight: spacing.sm,
   },
-  headerRight: {
-    alignItems: 'flex-end',
-  },
-  title: {
+  reportTitle: {
     fontWeight: 'bold',
     color: colors.text,
-    marginBottom: spacing.xs,
   },
-  subtitle: {
+  reportDate: {
     color: colors.textSecondary,
+    marginBottom: spacing.sm,
   },
-  details: {
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  detailRow: {
+  chipContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xs,
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
   },
-  detailLabel: {
-    color: colors.textSecondary,
-    fontWeight: '600',
+  chip: {
+    backgroundColor: colors.secondary,
   },
-  detailValue: {
-    color: colors.text,
-  },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
+  statusChip: {
     marginTop: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  actionButton: {
-    margin: 0,
-  },
-  chipEditable: {
-    backgroundColor: colors.success + '20',
-  },
-  chipLocked: {
-    backgroundColor: colors.error + '20',
-  },
-  chipReadOnly: {
-    backgroundColor: colors.warning + '20',
-  },
-  chipOffline: {
-    backgroundColor: colors.info + '20',
-  },
-  chipText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  chipTextSmall: {
-    fontSize: 11,
+    alignSelf: 'flex-start',
   },
 });
+
+export default PerformanceRepairElevatorListItem;
