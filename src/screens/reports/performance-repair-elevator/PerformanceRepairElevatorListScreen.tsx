@@ -44,15 +44,38 @@ export default function PerformanceRepairElevatorListScreen() {
   const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
-    checkConnection();
-    loadReports();
+    let isMounted = true;
+
+    const init = async () => {
+      // ✅ Obter estado da conexão PRIMEIRO
+      const state = await NetInfo.fetch();
+      const online = state.isConnected ?? false;
+
+      if (isMounted) {
+        console.log(`📡 Conexão inicial: ${online ? 'ONLINE' : 'OFFLINE'}`);
+        setIsOnline(online);
+        await loadReports();
+      }
+    };
+
+    init();
+
+    // ✅ Listener para mudanças
+    const unsubscribe = NetInfo.addEventListener(state => {
+      if (isMounted) {
+        const online = state.isConnected ?? false;
+        console.log(`📡 Conexão mudou: ${online ? 'ONLINE' : 'OFFLINE'}`);
+        setIsOnline(online);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
-  const checkConnection = async () => {
-    const state = await NetInfo.fetch();
-    setIsOnline(state.isConnected ?? false);
-  };
-
+  // Função para carregar os relatórios
   const loadReports = async () => {
     try {
       setLoading(true);
