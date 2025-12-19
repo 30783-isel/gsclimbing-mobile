@@ -1,6 +1,6 @@
 /**
  * Offline Performance Repair Elevator Reports Storage Service
- * Gere armazenamento local de relatórios Performance criados offline
+ * ✅ VERSÃO CORRIGIDA com tipos explícitos
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -9,28 +9,28 @@ import uuid from 'react-native-uuid';
 // ========== TIPOS ==========
 
 export interface OfflinePerformanceReport {
-    tempId: string;
-    projectId: number;
-    turbineId: number;
-    reportType: number;
-    data: {
-        site: string;
-        wtgNumber: string;
-        wtgType: string;
-        yearConstruction: string;
-        // ✅ ADICIONAR ESTES CAMPOS:
-        inpectorsWorkers?: string;        // ← FALTAVA
-        workCompleted?: 'Yes' | 'No';     // ← FALTAVA
-        turbineOperable?: 'Yes' | 'No';   // ← FALTAVA (nota: turbineOperable, não windturbineOperable)
-        performanceReport?: string;        // ← FALTAVA
-        additionalFields?: Record<string, { label: string; value: string }>; // ← FALTAVA
-    };
-    photos: OfflinePerformancePhoto[];
-    status: 'editing' | 'pending_sync' | 'syncing' | 'sync_error';
-    createdAt: string;
-    lastModified: string;
-    syncAttempts: number;
-    syncError?: string;
+  tempId: string;
+  projectId: number;
+  turbineId: number;
+  reportType: number; // 1 para Performance Repair Elevator
+  data: {
+    // ✅ TODOS OS CAMPOS EXPLÍCITOS
+    site: string;
+    wtgNumber: string;
+    wtgType: string;
+    yearConstruction: string;
+    inpectorsWorkers?: string;  // ✅ Nota: inpectors (com typo igual ao backend)
+    workCompleted?: 'Yes' | 'No' | 'yes' | 'no';
+    turbineOperable?: 'Yes' | 'No' | 'yes' | 'no';  // ✅ Nota: turbineOperable (não windturbine)
+    performanceReport?: string;
+    additionalFields?: Record<string, { label: string; value: string }>;
+  };
+  photos: OfflinePerformancePhoto[];
+  status: 'editing' | 'pending_sync' | 'syncing' | 'sync_error';
+  createdAt: string;
+  lastModified: string;
+  syncAttempts: number;
+  syncError?: string;
 }
 
 export interface OfflinePerformancePhoto {
@@ -53,9 +53,6 @@ const STORAGE_KEYS = {
 // ========== SERVICE ==========
 
 class OfflinePerformanceReportsService {
-  /**
-   * Criar novo relatório Performance offline
-   */
   async create(
     report: Omit<OfflinePerformanceReport, 'tempId' | 'status' | 'createdAt' | 'lastModified' | 'syncAttempts'>
   ): Promise<OfflinePerformanceReport> {
@@ -79,9 +76,6 @@ class OfflinePerformanceReportsService {
     return newReport;
   }
 
-  /**
-   * Atualizar relatório offline existente
-   */
   async update(
     tempId: string,
     updates: Partial<OfflinePerformanceReport>
@@ -107,17 +101,11 @@ class OfflinePerformanceReportsService {
     return updated;
   }
 
-  /**
-   * Obter relatório por ID temporário
-   */
   async getById(tempId: string): Promise<OfflinePerformanceReport | null> {
     const reports = await this.getAll();
     return reports.find(r => r.tempId === tempId) || null;
   }
 
-  /**
-   * Obter todos os relatórios offline
-   */
   async getAll(): Promise<OfflinePerformanceReport[]> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.OFFLINE_PERFORMANCE_REPORTS);
@@ -128,33 +116,21 @@ class OfflinePerformanceReportsService {
     }
   }
 
-  /**
-   * Obter relatórios por turbina
-   */
   async getByTurbine(turbineId: number): Promise<OfflinePerformanceReport[]> {
     const all = await this.getAll();
     return all.filter(r => r.turbineId === turbineId);
   }
 
-  /**
-   * Obter relatórios pendentes de sincronização
-   */
   async getPendingSync(): Promise<OfflinePerformanceReport[]> {
     const all = await this.getAll();
     return all.filter(r => r.status === 'pending_sync' || r.status === 'sync_error');
   }
 
-  /**
-   * Obter relatórios em edição
-   */
   async getEditing(): Promise<OfflinePerformanceReport[]> {
     const all = await this.getAll();
     return all.filter(r => r.status === 'editing');
   }
 
-  /**
-   * Marcar relatório para sincronização
-   */
   async markForSync(tempId: string): Promise<boolean> {
     const report = await this.getById(tempId);
     if (!report) {
@@ -167,16 +143,10 @@ class OfflinePerformanceReportsService {
     return true;
   }
 
-  /**
-   * Marcar relatório como sincronizando
-   */
   async markSyncing(tempId: string): Promise<void> {
     await this.update(tempId, { status: 'syncing' });
   }
 
-  /**
-   * Marcar relatório com erro de sincronização
-   */
   async markSyncError(tempId: string, error: string): Promise<void> {
     const report = await this.getById(tempId);
     if (!report) return;
@@ -188,9 +158,6 @@ class OfflinePerformanceReportsService {
     });
   }
 
-  /**
-   * Remover relatório após sincronização bem-sucedida
-   */
   async delete(tempId: string): Promise<boolean> {
     const reports = await this.getAll();
     const filtered = reports.filter(r => r.tempId !== tempId);
@@ -205,9 +172,6 @@ class OfflinePerformanceReportsService {
     return true;
   }
 
-  /**
-   * Limpar relatórios sincronizados
-   */
   async cleanSynced(): Promise<number> {
     const reports = await this.getAll();
     const unsyncedReports = reports.filter(
@@ -221,9 +185,6 @@ class OfflinePerformanceReportsService {
     return removedCount;
   }
 
-  /**
-   * Obter contadores
-   */
   async getCounts(): Promise<{
     total: number;
     editing: number;
@@ -240,24 +201,15 @@ class OfflinePerformanceReportsService {
     };
   }
 
-  /**
-   * Guardar timestamp da última sincronização
-   */
   async setLastSync(): Promise<void> {
     await AsyncStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString());
   }
 
-  /**
-   * Obter timestamp da última sincronização
-   */
   async getLastSync(): Promise<Date | null> {
     const timestamp = await AsyncStorage.getItem(STORAGE_KEYS.LAST_SYNC);
     return timestamp ? new Date(timestamp) : null;
   }
 
-  /**
-   * Método privado para guardar todos os relatórios
-   */
   private async _saveAll(reports: OfflinePerformanceReport[]): Promise<void> {
     try {
       await AsyncStorage.setItem(
@@ -270,9 +222,6 @@ class OfflinePerformanceReportsService {
     }
   }
 
-  /**
-   * Limpar TUDO (usar com cuidado!)
-   */
   async clearAll(): Promise<void> {
     await AsyncStorage.multiRemove([
       STORAGE_KEYS.OFFLINE_PERFORMANCE_REPORTS,
