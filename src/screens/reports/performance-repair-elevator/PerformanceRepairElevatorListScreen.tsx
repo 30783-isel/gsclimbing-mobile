@@ -82,7 +82,6 @@ export default function PerformanceRepairElevatorListScreen() {
     try {
       setLoading(true);
 
-      // ✅ Usar o parâmetro se fornecido, senão usar o estado
       const checkOnline = connectionStatus !== undefined ? connectionStatus : isOnline;
 
       console.log('🔍 Loading reports for turbine:', turbineId);
@@ -96,6 +95,8 @@ export default function PerformanceRepairElevatorListScreen() {
         return;
       }
 
+      // ✅ SÓ CHAMA API SE ONLINE
+      console.log('🌐 Tentando carregar da API...');
       const data = await performanceRepairElevatorAPI.getByTurbine(turbineId) as any[];
       console.log('📦 Reports received:', data);
 
@@ -114,11 +115,16 @@ export default function PerformanceRepairElevatorListScreen() {
       }
     } catch (error: any) {
       console.error('❌ Error loading reports:', error);
-      // ✅ Não mostrar Alert se for erro de offline
-      if (error.code !== 'OFFLINE') {
+
+      // ✅ IGNORAR erro de OFFLINE (não mostrar Alert)
+      if (error.code === 'OFFLINE' || error.message === 'Sem conexão à Internet') {
+        console.log('📵 Pedido bloqueado por estar offline');
+        setReports([]);
+      } else {
+        // Outros erros mostram Alert
         Alert.alert('Erro', error?.message || 'Não foi possível carregar os relatórios');
+        setReports([]);
       }
-      setReports([]);
     } finally {
       setLoading(false);
     }
