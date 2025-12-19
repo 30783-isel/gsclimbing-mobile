@@ -196,6 +196,32 @@ export default function DefectInspectionReportEditScreen() {
       // ========================================
       // MODO 3: Editar relatório online (reportId > 0)
       // ========================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       if (reportId > 0 && isOnline) {
         console.log('🌐 Carregando relatório online:', reportId);
 
@@ -207,26 +233,55 @@ export default function DefectInspectionReportEditScreen() {
         setWtgType(report.wtgType || '');
         setYearConstruction(report.yearConstruction || '');
 
-        // Carregar fotos do servidor
+        // ✅ CARREGAR FOTOS COM LOGS DETALHADOS
         const existingPhotos = await defectInspectionReportAPI.getPhotos(reportId);
+
+        // ✅ LOG 1: Quantas fotos foram recebidas
+        console.log('📸 ========== LOADING PHOTOS ==========');
+        console.log('📸 existingPhotos received:', existingPhotos?.length || 0);
+        if (existingPhotos && existingPhotos.length > 0) {
+          console.log('📸 First photo sample:', {
+            fileId: existingPhotos[0].fileId,
+            hash: existingPhotos[0].hash,
+            downloadUrl: existingPhotos[0].downloadUrl,
+          });
+        }
 
         const initialPhotos: PhotoData[] = Array.from({ length: 8 }, (_, i) => {
           const pageNumber = i < 4 ? 2 : 3;
           const position = (i % 4) + 1;
-          const existingPhoto = existingPhotos[i];
+          const existingPhoto = existingPhotos?.[i];  // ✅ Optional chaining
 
           if (existingPhoto) {
             const baseUrlClean = API_CONFIG.baseUrl.replace('/api/', '');
-            const correctPath = existingPhoto.downloadUrl.replace(
-              '/api/reports/files/download/',
-              '/api/reports/mobile/files/download/'
+
+            // ✅ CORREÇÃO: Garantir que downloadUrl tem barra inicial
+            let correctPath = existingPhoto.downloadUrl;
+            if (!correctPath.startsWith('/')) {
+              correctPath = '/' + correctPath;
+            }
+
+            // Corrigir o caminho para usar endpoint mobile
+            correctPath = correctPath.replace(
+              '/reports/files/download/',
+              '/reports/mobile/files/download/'
             );
+
             const fullImageUrl = correctPath.startsWith('http')
               ? correctPath
               : `${baseUrlClean}${correctPath}`;
 
+            // ✅ LOG: Verificar URL final
+            console.log(`📸 Photo ${i + 1} loaded:`, {
+              fileId: existingPhoto.fileId,
+              hash: existingPhoto.hash?.substring(0, 8) + '...',
+              originalUrl: existingPhoto.downloadUrl,
+              correctedPath: correctPath,
+              fullUrl: fullImageUrl,
+            });
+
             return {
-              id: `photo-${i}`,
+              id: String(existingPhoto.fileId),  // ✅ MUDANÇA: usar fileId como id
               uri: fullImageUrl,
               pageNumber,
               position,
@@ -236,6 +291,9 @@ export default function DefectInspectionReportEditScreen() {
               description: existingPhoto.description ?? '',
             };
           }
+
+          // ✅ LOG 3: Slots vazios
+          console.log(`📸 Photo ${i + 1}: empty slot`);
 
           return {
             id: `photo-${i}`,
@@ -251,6 +309,14 @@ export default function DefectInspectionReportEditScreen() {
 
         setPhotos(initialPhotos);
 
+        // ✅ LOG 4: Resumo final
+        console.log('✅ Photos state set:', {
+          total: initialPhotos.length,
+          withPhotos: initialPhotos.filter(p => p.uri && p.uri !== '').length,
+          emptySlots: initialPhotos.filter(p => !p.uri || p.uri === '').length,
+        });
+        console.log('📸 ========================================');
+
         // Carregar campos adicionais
         const fields: AdditionalField[] = [];
         for (let i = 1; i <= 7; i++) {
@@ -265,6 +331,38 @@ export default function DefectInspectionReportEditScreen() {
         console.log('✅ Relatório online carregado');
         return;
       }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
       // ========================================
       // MODO 4: Offline e tentou carregar relatório online
