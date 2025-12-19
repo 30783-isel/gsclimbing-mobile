@@ -47,6 +47,9 @@ import type {
 import { defectInspectionReportAPI } from '@/services/api/defectInspectionReport.api';
 import { offlineReportsService, OfflinePhoto } from '@/services/storage/offlineReports.service';
 import { ReportType } from '@/types/report.types';
+import Toast from 'react-native-toast-message';
+import { offlinePerformanceReportsService } from '@/services/storage/offlinePerformanceReports.service';
+import { performanceReportSyncService } from '@/services/sync/performanceReportSync.service';
 
 export default function DefectInspectionReportEditScreen() {
   const router = useRouter();
@@ -64,6 +67,7 @@ export default function DefectInspectionReportEditScreen() {
   const tempIdParam = params.tempId || null;
   const turbineId = params.turbineId ? parseInt(params.turbineId, 10) : 0;
   const projectId = params.projectId ? parseInt(params.projectId, 10) : 0;
+
   const turbineName = params.turbineName || '';
   const projectName = params.projectName || '';
 
