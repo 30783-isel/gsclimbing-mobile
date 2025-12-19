@@ -921,29 +921,47 @@ export default function DefectInspectionReportEditScreen() {
         </Card>
 
         {/* Fotografias - Página 2 */}
+        {/* Fotografias - Página 2 */}
         <Card style={styles.card}>
           <Card.Title title="Fotografias - Página 2" />
           <Card.Content>
             <View style={styles.photosGrid}>
-              {photos.slice(0, 4).map((photo, index) => (
-                <TouchableOpacity
-                  key={photo.id}
-                  style={styles.photoSlot}
-                  onPress={() => {
-                    setSelectedPhotoIndex(index);
-                    setPhotoDialogVisible(true);
-                  }}
-                >
-                  {photo.uri ? (
-                    <Image source={{ uri: photo.uri }} style={styles.photoImage} />
-                  ) : (
-                    <View style={styles.photoPlaceholder}>
-                      <IconButton icon="camera-plus" size={32} iconColor={colors.disabled} />
-                      <Text style={styles.photoLabel}>Posição {photo.position}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
+              {photos.slice(0, 4).map((photo, index) => {
+                // ✅ LOG: Verificar o que está a ser renderizado
+                console.log(`🖼️ RENDER Photo ${index + 1}:`, {
+                  id: photo.id,
+                  hasUri: !!photo.uri,
+                  uri: photo.uri?.substring(0, 60) + '...',
+                  fileId: photo.fileId,
+                });
+
+                return (
+                  <TouchableOpacity
+                    key={photo.id}
+                    style={styles.photoSlot}
+                    onPress={() => {
+                      setSelectedPhotoIndex(index);
+                      setPhotoDialogVisible(true);
+                    }}
+                  >
+                    {photo.uri ? (
+                      <Image
+                        source={{ uri: photo.uri }}
+                        style={styles.photoImage}
+                        // ✅ ADICIONAR: Callbacks de debug
+                        onLoadStart={() => console.log(`📥 Loading image ${index + 1}...`)}
+                        onLoad={() => console.log(`✅ Image ${index + 1} loaded successfully`)}
+                        onError={(error) => console.log(`❌ Image ${index + 1} failed:`, error.nativeEvent)}
+                      />
+                    ) : (
+                      <View style={styles.photoPlaceholder}>
+                        <IconButton icon="camera-plus" size={32} iconColor={colors.disabled} />
+                        <Text style={styles.photoLabel}>Posição {photo.position}</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </Card.Content>
         </Card>
@@ -953,25 +971,41 @@ export default function DefectInspectionReportEditScreen() {
           <Card.Title title="Fotografias - Página 3" />
           <Card.Content>
             <View style={styles.photosGrid}>
-              {photos.slice(4, 8).map((photo, index) => (
-                <TouchableOpacity
-                  key={photo.id}
-                  style={styles.photoSlot}
-                  onPress={() => {
-                    setSelectedPhotoIndex(index + 4);
-                    setPhotoDialogVisible(true);
-                  }}
-                >
-                  {photo.uri ? (
-                    <Image source={{ uri: photo.uri }} style={styles.photoImage} />
-                  ) : (
-                    <View style={styles.photoPlaceholder}>
-                      <IconButton icon="camera-plus" size={32} iconColor={colors.disabled} />
-                      <Text style={styles.photoLabel}>Posição {photo.position}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
+              {photos.slice(4, 8).map((photo, index) => {
+                // ✅ LOG: Verificar o que está a ser renderizado
+                console.log(`🖼️ RENDER Photo ${index + 5}:`, {
+                  id: photo.id,
+                  hasUri: !!photo.uri,
+                  uri: photo.uri?.substring(0, 60) + '...',
+                  fileId: photo.fileId,
+                });
+
+                return (
+                  <TouchableOpacity
+                    key={photo.id}
+                    style={styles.photoSlot}
+                    onPress={() => {
+                      setSelectedPhotoIndex(index + 4);
+                      setPhotoDialogVisible(true);
+                    }}
+                  >
+                    {photo.uri ? (
+                      <Image
+                        source={{ uri: photo.uri }}
+                        style={styles.photoImage}
+                        onLoadStart={() => console.log(`📥 Loading image ${index + 5}...`)}
+                        onLoad={() => console.log(`✅ Image ${index + 5} loaded successfully`)}
+                        onError={(error) => console.log(`❌ Image ${index + 5} failed:`, error.nativeEvent)}
+                      />
+                    ) : (
+                      <View style={styles.photoPlaceholder}>
+                        <IconButton icon="camera-plus" size={32} iconColor={colors.disabled} />
+                        <Text style={styles.photoLabel}>Posição {photo.position}</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </Card.Content>
         </Card>
