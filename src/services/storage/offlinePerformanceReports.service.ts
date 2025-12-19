@@ -9,27 +9,28 @@ import uuid from 'react-native-uuid';
 // ========== TIPOS ==========
 
 export interface OfflinePerformanceReport {
-  tempId: string;                    // UUID temporário gerado no mobile
-  projectId: number;
-  turbineId: number;
-  reportType: number;                // 1 para Performance Repair Elevator
-  data: {
-    site: string;
-    wtgNumber: string;
-    wtgType: string;
-    yearConstruction: string;
-    inpectorsWorkers?: string;
-    workCompleted?: 'Yes' | 'No';
-    turbineOperable?: 'Yes' | 'No';
-    performanceReport?: string;
-    additionalFields?: Record<string, { label: string; value: string }>;
-  };
-  photos: OfflinePerformancePhoto[];
-  status: 'editing' | 'pending_sync' | 'syncing' | 'sync_error';
-  createdAt: string;                 // ISO date string
-  lastModified: string;              // ISO date string
-  syncAttempts: number;
-  syncError?: string;
+    tempId: string;
+    projectId: number;
+    turbineId: number;
+    reportType: number;
+    data: {
+        site: string;
+        wtgNumber: string;
+        wtgType: string;
+        yearConstruction: string;
+        // ✅ ADICIONAR ESTES CAMPOS:
+        inpectorsWorkers?: string;        // ← FALTAVA
+        workCompleted?: 'Yes' | 'No';     // ← FALTAVA
+        turbineOperable?: 'Yes' | 'No';   // ← FALTAVA (nota: turbineOperable, não windturbineOperable)
+        performanceReport?: string;        // ← FALTAVA
+        additionalFields?: Record<string, { label: string; value: string }>; // ← FALTAVA
+    };
+    photos: OfflinePerformancePhoto[];
+    status: 'editing' | 'pending_sync' | 'syncing' | 'sync_error';
+    createdAt: string;
+    lastModified: string;
+    syncAttempts: number;
+    syncError?: string;
 }
 
 export interface OfflinePerformancePhoto {

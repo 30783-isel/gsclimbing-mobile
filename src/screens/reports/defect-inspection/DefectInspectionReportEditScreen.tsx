@@ -47,6 +47,9 @@ import type {
 import { defectInspectionReportAPI } from '@/services/api/defectInspectionReport.api';
 import { offlineReportsService, OfflinePhoto } from '@/services/storage/offlineReports.service';
 import { ReportType } from '@/types/report.types';
+import Toast from 'react-native-toast-message';
+import { offlinePerformanceReportsService } from '@/services/storage/offlinePerformanceReports.service';
+import { performanceReportSyncService } from '@/services/sync/performanceReportSync.service';
 
 export default function DefectInspectionReportEditScreen() {
   const router = useRouter();
@@ -119,50 +122,66 @@ export default function DefectInspectionReportEditScreen() {
       // ========================================
       // MODO 1: Relatório offline (via tempId)
       // ========================================
-      if (tempIdParam) {
-        console.log('📵 Carregando relatório offline:', tempIdParam);
-        const offlineReport = await offlineReportsService.getById(tempIdParam);
+        // MODO OFFLINE: Carregar relatório via tempId
+        if (tempIdParam) {
+            console.log('📵 Carregando relatório offline:', tempIdParam);
+            const offlineReport = await offlinePerformanceReportsService.getById(tempIdParam);
 
-        if (!offlineReport) {
-          Alert.alert('Erro', 'Relatório offline não encontrado');
-          router.back();
-          return;
+            if (!offlineReport) {
+                Alert.alert('Erro', 'Relatório offline não encontrado');
+                router.back();
+                return;
+            }
+
+            setIsOfflineMode(true);
+            setTempId(offlineReport.tempId);
+
+            setSite(offlineReport.data.site || '');
+            setWtgNumber(offlineReport.data.wtgNumber || '');
+            setWtgType(offlineReport.data.wtgType || '');
+            setYearConstruction(offlineReport.data.yearConstruction || '');
+            setInspectors(offlineReport.data.inpectorsWorkers || '');
+            
+            // ✅ Converter maiúsculas → minúsculas
+            setWorkCompleted(convertToLowerCase(offlineReport.data.workCompleted));
+            setWindturbineOperable(convertToLowerCase(offlineReport.data.turbineOperable));
+            
+            setPerformanceReport(offlineReport.data.performanceReport || '');
+
+            // Carregar fotos offline
+            const offlinePhotos: PhotoData[] = Array.from({ length: 4 }, (_, i) => {
+                const offlinePhoto = offlineReport.photos[i];
+                return {
+                    id: `photo-${i}`,
+                    uri: offlinePhoto?.uri || '',
+                    pageNumber: 4,
+                    position: i + 1,
+                    timestamp: Date.now(),
+                    isUploaded: false,
+                    description: offlinePhoto?.description || '',
+                };
+            });
+            setPhotos(offlinePhotos);
+
+            // Carregar campos adicionais
+            const fields: AdditionalField[] = [];
+            if (offlineReport.data.additionalFields) {
+                Object.entries(offlineReport.data.additionalFields).forEach(([key, field]) => {
+                    if (field && typeof field === 'object' && 'label' in field && 'value' in field) {
+                        fields.push({ 
+                            label: (field as any).label, 
+                            value: (field as any).value 
+                        });
+                    }
+                });
+            }
+            setAdditionalFields(fields);
+
+            console.log('✅ Relatório offline carregado');
+            setLoading(false);
+            return;
         }
-
-        setIsOfflineMode(true);
-        setTempId(offlineReport.tempId);
-
-        // Preencher formulário
-        setSite(offlineReport.data.site || '');
-        setWtgNumber(offlineReport.data.wtgNumber || '');
-        setWtgType(offlineReport.data.wtgType || '');
-        setYearConstruction(offlineReport.data.yearConstruction || '');
-
-        // Carregar fotos offline
-        const offlinePhotos: PhotoData[] = Array.from({ length: 8 }, (_, i) => {
-          const offlinePhoto = offlineReport.photos[i];
-          return {
-            id: `photo-${i}`,
-            uri: offlinePhoto?.uri || '',
-            pageNumber: i < 4 ? 2 : 3,
-            position: (i % 4) + 1,
-            timestamp: Date.now(),
-            isUploaded: false,
-            description: offlinePhoto?.filename ?? '',
-          };
-        });
-        setPhotos(offlinePhotos);
-
-        // Carregar campos adicionais
-        const fields: AdditionalField[] = Object.keys(offlineReport.data)
-          .filter(key => key.startsWith('additionalField'))
-          .map(key => offlineReport.data[key])
-          .filter(field => field && field.label && field.value);
-        setAdditionalFields(fields);
-
-        console.log('✅ Relatório offline carregado');
-        return;
-      }
+        // ✅ ========== FIM DO BLOCO OFFLINE ==========
 
       // ========================================
       // MODO 2: Criar novo relatório (reportId === 0)
