@@ -45,10 +45,16 @@ import type {
     AdditionalField,
 } from '@/types/performanceRepairElevator.types';
 import { API_CONFIG } from '@/constants/api';
+// ✅ ADICIONAR estas 3 linhas
+import Toast from 'react-native-toast-message';
+import { offlinePerformanceReportsService } from '@/services/storage/offlinePerformanceReports.service';
+import { performanceReportSyncService } from '@/services/sync/performanceReportSync.service';
+
 export default function PerformanceRepairElevatorEditScreen() {
     const router = useRouter();
     const params = useLocalSearchParams<{
         reportId?: string;
+        tempId?: string;
         turbineId?: string;
         projectId?: string;
         turbineName?: string;
@@ -59,12 +65,15 @@ export default function PerformanceRepairElevatorEditScreen() {
     const reportId = params.reportId ? parseInt(params.reportId, 10) : 0;
     const turbineId = params.turbineId ? parseInt(params.turbineId, 10) : 0;
     const projectId = params.projectId ? parseInt(params.projectId, 10) : 0;
+    const tempIdParam = params.tempId || null;
 
     // Estados gerais
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [isOnline, setIsOnline] = useState(true);
     const [reportUuid, setReportUuid] = useState<string>('');
+    const [isOfflineMode, setIsOfflineMode] = useState(false);
+    const [tempId, setTempId] = useState<string | null>(null);
 
     // Página 1: Dados Fundamentais
     const [site, setSite] = useState('');
@@ -112,6 +121,65 @@ export default function PerformanceRepairElevatorEditScreen() {
         console.log('🔍 loadData called with reportId:', reportId);
 
         try {
+            // MODO OFFLINE: Carregar relatório via tempId
+            if (tempIdParam) {
+                console.log('📵 Carregando relatório offline:', tempIdParam);
+                const offlineReport = await offlinePerformanceReportsService.getById(tempIdParam);
+
+                if (!offlineReport) {
+                    Alert.alert('Erro', 'Relatório offline não encontrado');
+                    router.back();
+                    return;
+                }
+
+                setIsOfflineMode(true);
+                setTempId(offlineReport.tempId);
+
+                setSite(offlineReport.data.site || '');
+                setWtgNumber(offlineReport.data.wtgNumber || '');
+                setWtgType(offlineReport.data.wtgType || '');
+                setYearConstruction(offlineReport.data.yearConstruction || '');
+                setInspectors(offlineReport.data.inpectorsWorkers || '');
+
+                // ✅ Converter maiúsculas → minúsculas
+                setWorkCompleted(convertToLowerCase(offlineReport.data.workCompleted));
+                setWindturbineOperable(convertToLowerCase(offlineReport.data.turbineOperable));
+
+                setPerformanceReport(offlineReport.data.performanceReport || '');
+
+                // Carregar fotos offline
+                const offlinePhotos: PhotoData[] = Array.from({ length: 4 }, (_, i) => {
+                    const offlinePhoto = offlineReport.photos[i];
+                    return {
+                        id: `photo-${i}`,
+                        uri: offlinePhoto?.uri || '',
+                        pageNumber: 4,
+                        position: i + 1,
+                        timestamp: Date.now(),
+                        isUploaded: false,
+                        description: offlinePhoto?.description || '',
+                    };
+                });
+                setPhotos(offlinePhotos);
+
+                // Carregar campos adicionais
+                const fields: AdditionalField[] = [];
+                if (offlineReport.data.additionalFields) {
+                    Object.entries(offlineReport.data.additionalFields).forEach(([key, field]) => {
+                        if (field && typeof field === 'object' && 'label' in field && 'value' in field) {
+                            fields.push({
+                                label: (field as any).label,
+                                value: (field as any).value
+                            });
+                        }
+                    });
+                }
+                setAdditionalFields(fields);
+
+                console.log('✅ Relatório offline carregado');
+                setLoading(false);
+                return;
+            }
             // Modo criar novo
             if (reportId === 0) {
                 console.log('✅ Modo CREATE - inicializando fotos vazias');
@@ -279,6 +347,105 @@ export default function PerformanceRepairElevatorEditScreen() {
         setSaving(true);
 
         try {
+
+
+
+
+
+
+
+
+
+            // Verificar conexão
+            const state = await NetInfo.fetch();
+            const currentlyOnline = state.isConnected ?? false;
+
+            // Preparar dados do relatório
+            const reportData = {
+                site,
+                wtgNumber,
+                wtgType,
+                yearConstruction,
+                inpectorsWorkers: inspectors || undefined,
+                // ✅ Converter minúsculas → maiúsculas
+                workCompleted: convertToUpperCase(workCompleted),
+                turbineOperable: convertToUpperCase(windturbineOperable),
+                performanceReport: performanceReport || undefined,
+                additionalFields: additionalFields.length > 0
+                    ? additionalFields.reduce((acc, field, index) => {
+                        acc[`additionalField${index + 1}`] = {
+                            label: field.label,
+                            value: field.value
+                        };
+                        return acc;
+                    }, {} as Record<string, { label: string; value: string }>)
+                    : undefined,
+            };
+
+            // MODO OFFLINE
+            if (!currentlyOnline) {
+                console.log('📵 OFFLINE → Guardar localmente');
+
+                const offlinePhotos = photos
+                    .filter(p => p.uri && p.uri.trim() !== '')
+                    .map(p => ({
+                        tempId: p.id,
+                        uri: p.uri,
+                        filename: `photo_${p.position}.jpg`,
+                        mimeType: 'image/jpeg',
+                        description: p.description || '',
+                    }));
+
+                if (isOfflineMode && tempId) {
+                    // Atualizar offline existente
+                    await offlinePerformanceReportsService.update(tempId, {
+                        data: reportData,
+                        photos: offlinePhotos,
+                    });
+
+                    Toast.show({
+                        type: 'success',
+                        text1: '✅ Relatório Atualizado Offline',
+                        text2: 'Será sincronizado quando houver conexão',
+                        visibilityTime: 3000,
+                    });
+                } else {
+                    // Criar novo offline
+                    const offlineReport = await offlinePerformanceReportsService.create({
+                        projectId: projectId || 0,
+                        turbineId: turbineId,
+                        reportType: 1,
+                        data: reportData,
+                        photos: offlinePhotos,
+                    });
+
+                    Toast.show({
+                        type: 'success',
+                        text1: '📵 Relatório Guardado Offline',
+                        text2: 'Será sincronizado automaticamente',
+                        visibilityTime: 4000,
+                    });
+
+                    console.log('✅ Report created offline:', offlineReport.tempId);
+                }
+
+                setTimeout(() => {
+                    router.back();
+                }, 1000);
+
+                setSaving(false);
+                return;
+            }
+
+
+
+
+
+
+
+
+
+
             console.log('💾 Starting save process...');
             let savedReportUuid = reportUuid;
             let savedReportId = reportId;
@@ -571,6 +738,18 @@ export default function PerformanceRepairElevatorEditScreen() {
             setFieldValue('');
         }
         setFieldDialogVisible(true);
+    };
+
+    const convertToLowerCase = (value?: 'Yes' | 'No'): '' | 'yes' | 'no' => {
+        if (value === 'Yes') return 'yes';
+        if (value === 'No') return 'no';
+        return '';
+    };
+
+    const convertToUpperCase = (value: '' | 'yes' | 'no'): 'Yes' | 'No' | undefined => {
+        if (value === 'yes') return 'Yes';
+        if (value === 'no') return 'No';
+        return undefined;
     };
 
     // ====================================================================
