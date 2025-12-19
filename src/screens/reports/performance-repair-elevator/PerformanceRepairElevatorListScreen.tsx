@@ -57,10 +57,18 @@ export default function PerformanceRepairElevatorListScreen() {
     try {
       setLoading(true);
       console.log('🔍 Loading reports for turbine:', turbineId);
-      
+
+      // ✅ VERIFICAR SE ESTÁ OFFLINE
+      if (!isOnline) {
+        console.log('📵 Offline - não é possível carregar relatórios da API');
+        setReports([]);
+        setLoading(false);
+        return;
+      }
+
       const data = await performanceRepairElevatorAPI.getByTurbine(turbineId) as any[];
       console.log('📦 Reports received:', data);
-      
+
       if (!data || !Array.isArray(data)) {
         setReports([]);
       } else {
@@ -71,7 +79,7 @@ export default function PerformanceRepairElevatorListScreen() {
             ...report,
             reportId: report.reportId || report.id,
           }));
-        
+
         console.log('✅ Valid reports:', normalizedReports.length);
         setReports(normalizedReports);
       }
@@ -111,7 +119,7 @@ export default function PerformanceRepairElevatorListScreen() {
               Alert.alert('Modo Offline', 'Não é possível eliminar relatórios quando offline.');
               return;
             }
-            
+
             try {
               console.log('🗑️ Deleting report:', reportId);
               await performanceRepairElevatorAPI.delete(reportId);
@@ -129,17 +137,17 @@ export default function PerformanceRepairElevatorListScreen() {
 
 
 
-const handleHistory = (reportId: number) => {
-  console.log('📜 Opening history for report:', reportId);
-  router.push({
-    pathname: `${basePath}/reports/performance-repair-elevator/${reportId}/history` as any,
-    params: {
-      reportId: reportId.toString(),
-      projectName: params.projectName,
-      turbineName: params.turbineName,
-    },
-  });
-};
+  const handleHistory = (reportId: number) => {
+    console.log('📜 Opening history for report:', reportId);
+    router.push({
+      pathname: `${basePath}/reports/performance-repair-elevator/${reportId}/history` as any,
+      params: {
+        reportId: reportId.toString(),
+        projectName: params.projectName,
+        turbineName: params.turbineName,
+      },
+    });
+  };
 
   // Handler para criar novo
   const handleCreateNew = () => {
@@ -211,7 +219,7 @@ const handleHistory = (reportId: number) => {
               console.warn('⚠️ Skipping invalid report:', report);
               return null;
             }
-            
+
             return (
               <PerformanceRepairElevatorListItem
                 key={report.reportId}

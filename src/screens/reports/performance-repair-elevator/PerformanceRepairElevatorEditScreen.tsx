@@ -341,208 +341,215 @@ export default function PerformanceRepairElevatorEditScreen() {
     // CORREÇÃO DO handleSave - Evitar múltiplas inserções
     // ====================================================================
 
-const handleSave = async () => {
-    if (!validateForm()) return;
+    const handleSave = async () => {
+        if (!validateForm()) return;
 
-    setSaving(true);
+        setSaving(true);
 
-    try {
-        console.log('💾 Starting save process...');
+        try {
+            console.log('💾 Starting save process...');
 
-        // ✅ PASSO 1: VERIFICAR CONEXÃO
-        const state = await NetInfo.fetch();
-        const currentlyOnline = state.isConnected ?? false;
-        console.log(`🌐 Conexão: ${currentlyOnline ? 'ONLINE' : 'OFFLINE'}`);
+            // ✅ USAR O ESTADO EXISTENTE (já monitorizado pelo useEffect)
+            console.log(`🌐 Conexão: ${isOnline ? 'ONLINE' : 'OFFLINE'}`);
 
-        // ✅ PASSO 2: PREPARAR DADOS
-        const reportData = {
-            site,
-            wtgNumber,
-            wtgType,
-            yearConstruction,
-            inpectorsWorkers: inspectors || undefined,
-            workCompleted: workCompleted === 'yes' ? 'Yes' : 
-                           workCompleted === 'no' ? 'No' : 
-                           undefined,
-            turbineOperable: windturbineOperable === 'yes' ? 'Yes' : 
-                             windturbineOperable === 'no' ? 'No' : 
-                             undefined,
-            performanceReport: performanceReport || undefined,
-            additionalFields: additionalFields.length > 0 
-                ? additionalFields.reduce((acc, field, index) => {
-                    acc[`additionalField${index + 1}`] = { 
-                        label: field.label, 
-                        value: field.value 
-                    };
-                    return acc;
-                }, {} as Record<string, { label: string; value: string }>) 
-                : undefined,
-        };
+            // ✅ PREPARAR DADOS
+            const reportData: {
+                site: string;
+                wtgNumber: string;
+                wtgType: string;
+                yearConstruction: string;
+                inpectorsWorkers?: string;
+                workCompleted?: 'Yes' | 'No';
+                turbineOperable?: 'Yes' | 'No';
+                performanceReport?: string;
+                additionalFields?: Record<string, { label: string; value: string }>;
+            } = {
+                site,
+                wtgNumber,
+                wtgType,
+                yearConstruction,
+                inpectorsWorkers: inspectors || undefined,
+                workCompleted: (workCompleted === 'yes' ? 'Yes' :
+                    workCompleted === 'no' ? 'No' :
+                        undefined) as 'Yes' | 'No' | undefined,
+                turbineOperable: (windturbineOperable === 'yes' ? 'Yes' :
+                    windturbineOperable === 'no' ? 'No' :
+                        undefined) as 'Yes' | 'No' | undefined,
+                performanceReport: performanceReport || undefined,
+                additionalFields: additionalFields.length > 0
+                    ? additionalFields.reduce((acc, field, index) => {
+                        acc[`additionalField${index + 1}`] = {
+                            label: field.label,
+                            value: field.value
+                        };
+                        return acc;
+                    }, {} as Record<string, { label: string; value: string }>)
+                    : undefined,
+            };
 
-        // ✅ OPÇÃO A: OFFLINE
-        if (!currentlyOnline) {
-            console.log('📵 OFFLINE → Guardar localmente');
+            // ✅ MODO OFFLINE - Verificar ANTES de qualquer chamada API
+            if (!isOnline) {
+                console.log('📵 OFFLINE → Guardar localmente');
 
-            const offlinePhotos = photos
-                .filter(p => p.uri && p.uri.trim() !== '')
-                .map(p => ({
-                    tempId: p.id,
-                    uri: p.uri,
-                    filename: `photo_${p.position}.jpg`,
-                    mimeType: 'image/jpeg',
-                    description: p.description || '',
-                }));
+                const offlinePhotos = photos
+                    .filter(p => p.uri && p.uri.trim() !== '')
+                    .map(p => ({
+                        tempId: p.id,
+                        uri: p.uri,
+                        filename: `photo_${p.position}.jpg`,
+                        mimeType: 'image/jpeg',
+                        description: p.description || '',
+                    }));
 
-            // Criar novo offline
-            const offlineReport = await offlinePerformanceReportsService.create({
-                projectId: projectId || 0,
-                turbineId: turbineId,
-                reportType: 1,
-                data: reportData,
-                photos: offlinePhotos,
-            });
+                const offlineReport = await offlinePerformanceReportsService.create({
+                    projectId: projectId || 0,
+                    turbineId: turbineId,
+                    reportType: 1,
+                    data: reportData,
+                    photos: offlinePhotos,
+                });
 
-            Toast.show({
-                type: 'success',
-                text1: '📵 Relatório Guardado Offline',
-                text2: 'Será sincronizado automaticamente',
-                visibilityTime: 4000,
-            });
+                Toast.show({
+                    type: 'success',
+                    text1: '📵 Relatório Guardado Offline',
+                    text2: 'Será sincronizado automaticamente',
+                    visibilityTime: 4000,
+                });
 
-            console.log('✅ Report created offline:', offlineReport.tempId);
+                console.log('✅ Report created offline:', offlineReport.tempId);
 
-            setTimeout(() => {
-                router.back();
-            }, 1000);
+                setTimeout(() => {
+                    router.back();
+                }, 1000);
 
-            setSaving(false);
-            return;
-        }
-
-        // ✅ OPÇÃO B: ONLINE (código existente)
-        let savedReportUuid = reportUuid;
-        let savedReportId = reportId;
-
-        const baseData: PerformanceRepairElevatorData = {
-            site,
-            wtgNumber,
-            wtgType,
-            yearConstruction,
-            inspectors,
-            workCompleted,
-            windturbineOperable,
-            performanceReport,
-            projectoId: projectId,
-            turbinaId: turbineId,
-            photos: [],
-            additionalFields,
-        };
-
-        if (reportId === 0) {
-            console.log('📝 Creating new report...');
-            const result = await performanceRepairElevatorAPI.create(baseData);
-            savedReportUuid = result.uuid;
-            savedReportId = result.reportId;
-            setReportUuid(result.uuid);
-            console.log('✅ Report created:', result.reportId, result.uuid);
-
-            const photosToUpload = photos.filter(p => p.uri && !p.isUploaded);
-
-            if (photosToUpload.length > 0) {
-                console.log(`📸 Uploading ${photosToUpload.length} photos...`);
-                const uploadedPhotos = [...photos];
-                const uploadedPhotoIds: string[] = [];
-
-                for (let i = 0; i < photos.length; i++) {
-                    const photo = photos[i];
-                    if (photo.uri && !photo.isUploaded) {
-                        console.log(`📤 Uploading photo ${i + 1}...`);
-                        try {
-                            const uploaded = await performanceRepairElevatorAPI.uploadPhoto(photo, savedReportUuid);
-                            uploadedPhotos[i] = {
-                                ...photo,
-                                fileId: String(uploaded.fileId),
-                                isUploaded: true,
-                            };
-                            uploadedPhotoIds.push(String(uploaded.fileId));
-                            console.log(`✅ Photo ${i + 1} uploaded:`, uploaded.fileId);
-                        } catch (photoError) {
-                            console.error(`❌ Error uploading photo ${i + 1}:`, photoError);
-                        }
-                    }
-                }
-
-                if (uploadedPhotoIds.length > 0) {
-                    console.log('📝 Updating report with photo IDs...');
-                    const finalData: PerformanceRepairElevatorData = {
-                        ...baseData,
-                        photos: uploadedPhotos,
-                    };
-                    await performanceRepairElevatorAPI.update(savedReportId, finalData);
-                    console.log('✅ Report updated with photos');
-                }
-
-                setPhotos(uploadedPhotos);
+                setSaving(false);
+                return; // ← IMPORTANTE: Sair aqui!
             }
 
-        } else {
-            console.log('📝 Updating existing report...');
+            // ✅ MODO ONLINE - Código existente mantém-se
+            let savedReportUuid = reportUuid;
+            let savedReportId = reportId;
 
-            const photosToUpload = photos.filter(p => p.uri && !p.isUploaded);
+            const baseData: PerformanceRepairElevatorData = {
+                site,
+                wtgNumber,
+                wtgType,
+                yearConstruction,
+                inspectors,
+                workCompleted,
+                windturbineOperable,
+                performanceReport,
+                projectoId: projectId,
+                turbinaId: turbineId,
+                photos: [],
+                additionalFields,
+            };
 
-            if (photosToUpload.length === 0) {
-                await performanceRepairElevatorAPI.update(reportId, baseData);
-                console.log('✅ Report updated (no new photos)');
+            if (reportId === 0) {
+                console.log('📝 Creating new report...');
+                const result = await performanceRepairElevatorAPI.create(baseData);
+                savedReportUuid = result.uuid;
+                savedReportId = result.reportId;
+                setReportUuid(result.uuid);
+                console.log('✅ Report created:', result.reportId, result.uuid);
+
+                const photosToUpload = photos.filter(p => p.uri && !p.isUploaded);
+
+                if (photosToUpload.length > 0) {
+                    console.log(`📸 Uploading ${photosToUpload.length} photos...`);
+                    const uploadedPhotos = [...photos];
+                    const uploadedPhotoIds: string[] = [];
+
+                    for (let i = 0; i < photos.length; i++) {
+                        const photo = photos[i];
+                        if (photo.uri && !photo.isUploaded) {
+                            console.log(`📤 Uploading photo ${i + 1}...`);
+                            try {
+                                const uploaded = await performanceRepairElevatorAPI.uploadPhoto(photo, savedReportUuid);
+                                uploadedPhotos[i] = {
+                                    ...photo,
+                                    fileId: String(uploaded.fileId),
+                                    isUploaded: true,
+                                };
+                                uploadedPhotoIds.push(String(uploaded.fileId));
+                                console.log(`✅ Photo ${i + 1} uploaded:`, uploaded.fileId);
+                            } catch (photoError) {
+                                console.error(`❌ Error uploading photo ${i + 1}:`, photoError);
+                            }
+                        }
+                    }
+
+                    if (uploadedPhotoIds.length > 0) {
+                        console.log('📝 Updating report with photo IDs...');
+                        const finalData: PerformanceRepairElevatorData = {
+                            ...baseData,
+                            photos: uploadedPhotos,
+                        };
+                        await performanceRepairElevatorAPI.update(savedReportId, finalData);
+                        console.log('✅ Report updated with photos');
+                    }
+
+                    setPhotos(uploadedPhotos);
+                }
 
             } else {
-                console.log(`📸 Uploading ${photosToUpload.length} new photos...`);
-                const uploadedPhotos = [...photos];
-                let photosChanged = false;
+                console.log('📝 Updating existing report...');
 
-                for (let i = 0; i < photos.length; i++) {
-                    const photo = photos[i];
-                    if (photo.uri && !photo.isUploaded) {
-                        console.log(`📤 Uploading photo ${i + 1}...`);
-                        try {
-                            const uploaded = await performanceRepairElevatorAPI.uploadPhoto(photo, reportUuid);
-                            uploadedPhotos[i] = {
-                                ...photo,
-                                fileId: String(uploaded.fileId),
-                                isUploaded: true,
-                            };
-                            photosChanged = true;
-                            console.log(`✅ Photo ${i + 1} uploaded:`, uploaded.fileId);
-                        } catch (photoError) {
-                            console.error(`❌ Error uploading photo ${i + 1}:`, photoError);
+                const photosToUpload = photos.filter(p => p.uri && !p.isUploaded);
+
+                if (photosToUpload.length === 0) {
+                    await performanceRepairElevatorAPI.update(reportId, baseData);
+                    console.log('✅ Report updated (no new photos)');
+
+                } else {
+                    console.log(`📸 Uploading ${photosToUpload.length} new photos...`);
+                    const uploadedPhotos = [...photos];
+                    let photosChanged = false;
+
+                    for (let i = 0; i < photos.length; i++) {
+                        const photo = photos[i];
+                        if (photo.uri && !photo.isUploaded) {
+                            console.log(`📤 Uploading photo ${i + 1}...`);
+                            try {
+                                const uploaded = await performanceRepairElevatorAPI.uploadPhoto(photo, reportUuid);
+                                uploadedPhotos[i] = {
+                                    ...photo,
+                                    fileId: String(uploaded.fileId),
+                                    isUploaded: true,
+                                };
+                                photosChanged = true;
+                                console.log(`✅ Photo ${i + 1} uploaded:`, uploaded.fileId);
+                            } catch (photoError) {
+                                console.error(`❌ Error uploading photo ${i + 1}:`, photoError);
+                            }
                         }
                     }
-                }
 
-                if (photosChanged) {
-                    const finalData: PerformanceRepairElevatorData = {
-                        ...baseData,
-                        photos: uploadedPhotos,
-                    };
-                    await performanceRepairElevatorAPI.update(reportId, finalData);
-                    console.log('✅ Report updated with photos');
-                }
+                    if (photosChanged) {
+                        const finalData: PerformanceRepairElevatorData = {
+                            ...baseData,
+                            photos: uploadedPhotos,
+                        };
+                        await performanceRepairElevatorAPI.update(reportId, finalData);
+                        console.log('✅ Report updated with photos');
+                    }
 
-                setPhotos(uploadedPhotos);
+                    setPhotos(uploadedPhotos);
+                }
             }
+
+            console.log('✅ Save process completed');
+            Alert.alert('Sucesso', 'Relatório guardado com sucesso', [
+                { text: 'OK', onPress: () => router.back() },
+            ]);
+
+        } catch (error: any) {
+            console.error('❌ Error saving report:', error);
+            Alert.alert('Erro', error.message || 'Não foi possível guardar o relatório');
+        } finally {
+            setSaving(false);
         }
-
-        console.log('✅ Save process completed');
-        Alert.alert('Sucesso', 'Relatório guardado com sucesso', [
-            { text: 'OK', onPress: () => router.back() },
-        ]);
-
-    } catch (error: any) {
-        console.error('❌ Error saving report:', error);
-        Alert.alert('Erro', error.message || 'Não foi possível guardar o relatório');
-    } finally {
-        setSaving(false);
-    }
-};
+    };
 
     // ====================================================================
     // EXPLICAÇÃO DA CORREÇÃO
