@@ -54,7 +54,9 @@ export default function PerformanceRepairElevatorListScreen() {
       if (isMounted) {
         console.log(`📡 Conexão inicial: ${online ? 'ONLINE' : 'OFFLINE'}`);
         setIsOnline(online);
-        await loadReports();
+
+        // ✅ PASSAR O VALOR DIRETAMENTE
+        await loadReports(online);  // ← MUDANÇA AQUI
       }
     };
 
@@ -75,15 +77,20 @@ export default function PerformanceRepairElevatorListScreen() {
     };
   }, []);
 
-  // Função para carregar os relatórios
-  const loadReports = async () => {
+  // ✅ Mudar a assinatura da função para aceitar parâmetro
+  const loadReports = async (connectionStatus?: boolean) => {
     try {
       setLoading(true);
+
+      // ✅ Usar o parâmetro se fornecido, senão usar o estado
+      const checkOnline = connectionStatus !== undefined ? connectionStatus : isOnline;
+
       console.log('🔍 Loading reports for turbine:', turbineId);
+      console.log(`📡 Connection status: ${checkOnline ? 'ONLINE' : 'OFFLINE'}`);
 
       // ✅ VERIFICAR SE ESTÁ OFFLINE
-      if (!isOnline) {
-        console.log('📵 Offline - não é possível carregar relatórios da API');
+      if (!checkOnline) {
+        console.log('📵 Offline - não carregar relatórios');
         setReports([]);
         setLoading(false);
         return;
@@ -95,7 +102,6 @@ export default function PerformanceRepairElevatorListScreen() {
       if (!data || !Array.isArray(data)) {
         setReports([]);
       } else {
-        // ✅ Normalizar: converter "id" para "reportId"
         const normalizedReports: Report[] = data
           .filter(report => report != null)
           .map(report => ({
@@ -108,7 +114,10 @@ export default function PerformanceRepairElevatorListScreen() {
       }
     } catch (error: any) {
       console.error('❌ Error loading reports:', error);
-      Alert.alert('Erro', error?.message || 'Não foi possível carregar os relatórios');
+      // ✅ Não mostrar Alert se for erro de offline
+      if (error.code !== 'OFFLINE') {
+        Alert.alert('Erro', error?.message || 'Não foi possível carregar os relatórios');
+      }
       setReports([]);
     } finally {
       setLoading(false);
@@ -217,7 +226,7 @@ export default function PerformanceRepairElevatorListScreen() {
           icon="refresh"
           iconColor={colors.white}
           size={24}
-          onPress={loadReports}
+          onPress={() => loadReports()}
         />
       </View>
 
