@@ -141,7 +141,7 @@ export default function PerformanceRepairElevatorListScreen() {
   // Handler para criar novo
   const handleCreateNew = () => {
     router.push({
-      pathname: `${basePath}/reports/performance-repair-elevator/create` as any,
+      pathname: `${basePath}/reports/performance-repair-elevator/edit` as any,
       params: {
         turbineId: turbineId.toString(),
         turbineName: params.turbineName,
