@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Text, Card, IconButton, Chip, Portal, Dialog, Button, Banner } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { projectsAPI } from '@/services/api/projects.api';
 import { dataCacheService } from '@/services/storage/dataCache.service';
@@ -22,6 +23,7 @@ const CACHE_KEYS = {
 export default function TurbineDetailsScreen() {
   const { id, turbineId } = useLocalSearchParams<{ id: string; turbineId: string }>();
   const router = useRouter();
+  const { t } = useTranslation();
   const { role } = useAuthStore();
   
   const [turbine, setTurbine] = useState<Turbine | null>(null);
@@ -113,7 +115,7 @@ export default function TurbineDetailsScreen() {
           console.log('✅ Projeto da API:', projectData?.name);
           
           // Guardar em cache para uso offline futuro
-          await saveToCache( projectData!);
+          await saveToCache(turbineData, projectData);
           
         } catch (apiError: any) {
           console.error('❌ Erro na API:', apiError.message);
@@ -245,7 +247,7 @@ export default function TurbineDetailsScreen() {
   /**
    * Guardar dados no cache
    */
-  const saveToCache = async (project: Project) => {
+  const saveToCache = async (turbine: Turbine, project: Project) => {
     console.log('💾 Guardando em cache...');
     
     try {
@@ -313,7 +315,17 @@ export default function TurbineDetailsScreen() {
           turbineName: turbine?.name || 'Turbina',
         },
       });
-    } else {
+    } else if (reportType === ReportType.PERFORMANCE_REPAIR_ELEVATOR) {
+        router.push({
+          pathname: `${basePath}/reports/performance-repair-elevator/edit` as any,
+          params: {
+          projectoId: id,
+          turbinaId: turbineId,
+          projectName: project?.name || 'Projeto',
+          turbineName: turbine?.name || 'Turbina',
+          },
+        });
+    }else {
       // Outros tipos de relatório requerem conexão
       if (!isOnline) {
         Alert.alert('Modo Offline', 'Este tipo de relatório requer conexão à internet.');
@@ -329,6 +341,17 @@ export default function TurbineDetailsScreen() {
   const handleViewReports = () => {
     router.push({
       pathname: `${basePath}/reports/defect-inspection/list` as any,
+      params: {
+        turbineId: turbineId,
+        turbineName: turbine?.name || 'Turbina',
+        projectName: project?.name || 'Projeto',
+      },
+    });
+  };
+
+  const handleViewPerformanceReports = () => {
+    router.push({
+      pathname: `${basePath}/reports/performance-repair-elevator/list` as any,
       params: {
         turbineId: turbineId,
         turbineName: turbine?.name || 'Turbina',
@@ -442,6 +465,15 @@ export default function TurbineDetailsScreen() {
           style={styles.viewReportsButton}>
           Ver Relatórios Defect Inspection
         </Button>
+
+        <Button 
+          mode="contained" 
+          icon="elevator" 
+          onPress={handleViewPerformanceReports}
+          style={styles.viewReportsButton}
+        >
+  Ver Relatórios Performance Repair Elevator
+</Button>
 
         <View style={styles.section}>
           <Text variant="titleMedium" style={styles.sectionTitle}>Criar Novo Relatório</Text>
