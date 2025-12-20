@@ -47,9 +47,6 @@ import type {
 import { defectInspectionReportAPI } from '@/services/api/defectInspectionReport.api';
 import { offlineReportsService, OfflinePhoto } from '@/services/storage/offlineReports.service';
 import { ReportType } from '@/types/report.types';
-import Toast from 'react-native-toast-message';
-import { offlinePerformanceReportsService } from '@/services/storage/offlinePerformanceReports.service';
-import { performanceReportSyncService } from '@/services/sync/performanceReportSync.service';
 
 export default function DefectInspectionReportEditScreen() {
   const router = useRouter();
@@ -67,7 +64,6 @@ export default function DefectInspectionReportEditScreen() {
   const tempIdParam = params.tempId || null;
   const turbineId = params.turbineId ? parseInt(params.turbineId, 10) : 0;
   const projectId = params.projectId ? parseInt(params.projectId, 10) : 0;
-
   const turbineName = params.turbineName || '';
   const projectName = params.projectName || '';
 
@@ -123,66 +119,50 @@ export default function DefectInspectionReportEditScreen() {
       // ========================================
       // MODO 1: Relatório offline (via tempId)
       // ========================================
-        // MODO OFFLINE: Carregar relatório via tempId
-        if (tempIdParam) {
-            console.log('📵 Carregando relatório offline:', tempIdParam);
-            const offlineReport = await offlinePerformanceReportsService.getById(tempIdParam);
+      if (tempIdParam) {
+        console.log('📵 Carregando relatório offline:', tempIdParam);
+        const offlineReport = await offlineReportsService.getById(tempIdParam);
 
-            if (!offlineReport) {
-                Alert.alert('Erro', 'Relatório offline não encontrado');
-                router.back();
-                return;
-            }
-
-            setIsOfflineMode(true);
-            setTempId(offlineReport.tempId);
-
-            setSite(offlineReport.data.site || '');
-            setWtgNumber(offlineReport.data.wtgNumber || '');
-            setWtgType(offlineReport.data.wtgType || '');
-            setYearConstruction(offlineReport.data.yearConstruction || '');
-            setInspectors(offlineReport.data.inpectorsWorkers || '');
-            
-            // ✅ Converter maiúsculas → minúsculas
-            setWorkCompleted(convertToLowerCase(offlineReport.data.workCompleted));
-            setWindturbineOperable(convertToLowerCase(offlineReport.data.turbineOperable));
-            
-            setPerformanceReport(offlineReport.data.performanceReport || '');
-
-            // Carregar fotos offline
-            const offlinePhotos: PhotoData[] = Array.from({ length: 4 }, (_, i) => {
-                const offlinePhoto = offlineReport.photos[i];
-                return {
-                    id: `photo-${i}`,
-                    uri: offlinePhoto?.uri || '',
-                    pageNumber: 4,
-                    position: i + 1,
-                    timestamp: Date.now(),
-                    isUploaded: false,
-                    description: offlinePhoto?.description || '',
-                };
-            });
-            setPhotos(offlinePhotos);
-
-            // Carregar campos adicionais
-            const fields: AdditionalField[] = [];
-            if (offlineReport.data.additionalFields) {
-                Object.entries(offlineReport.data.additionalFields).forEach(([key, field]) => {
-                    if (field && typeof field === 'object' && 'label' in field && 'value' in field) {
-                        fields.push({ 
-                            label: (field as any).label, 
-                            value: (field as any).value 
-                        });
-                    }
-                });
-            }
-            setAdditionalFields(fields);
-
-            console.log('✅ Relatório offline carregado');
-            setLoading(false);
-            return;
+        if (!offlineReport) {
+          Alert.alert('Erro', 'Relatório offline não encontrado');
+          router.back();
+          return;
         }
-        // ✅ ========== FIM DO BLOCO OFFLINE ==========
+
+        setIsOfflineMode(true);
+        setTempId(offlineReport.tempId);
+
+        // Preencher formulário
+        setSite(offlineReport.data.site || '');
+        setWtgNumber(offlineReport.data.wtgNumber || '');
+        setWtgType(offlineReport.data.wtgType || '');
+        setYearConstruction(offlineReport.data.yearConstruction || '');
+
+        // Carregar fotos offline
+        const offlinePhotos: PhotoData[] = Array.from({ length: 8 }, (_, i) => {
+          const offlinePhoto = offlineReport.photos[i];
+          return {
+            id: `photo-${i}`,
+            uri: offlinePhoto?.uri || '',
+            pageNumber: i < 4 ? 2 : 3,
+            position: (i % 4) + 1,
+            timestamp: Date.now(),
+            isUploaded: false,
+            description: offlinePhoto?.filename ?? '',
+          };
+        });
+        setPhotos(offlinePhotos);
+
+        // Carregar campos adicionais
+        const fields: AdditionalField[] = Object.keys(offlineReport.data)
+          .filter(key => key.startsWith('additionalField'))
+          .map(key => offlineReport.data[key])
+          .filter(field => field && field.label && field.value);
+        setAdditionalFields(fields);
+
+        console.log('✅ Relatório offline carregado');
+        return;
+      }
 
       // ========================================
       // MODO 2: Criar novo relatório (reportId === 0)
@@ -216,32 +196,6 @@ export default function DefectInspectionReportEditScreen() {
       // ========================================
       // MODO 3: Editar relatório online (reportId > 0)
       // ========================================
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
       if (reportId > 0 && isOnline) {
         console.log('🌐 Carregando relatório online:', reportId);
 
@@ -253,55 +207,26 @@ export default function DefectInspectionReportEditScreen() {
         setWtgType(report.wtgType || '');
         setYearConstruction(report.yearConstruction || '');
 
-        // ✅ CARREGAR FOTOS COM LOGS DETALHADOS
+        // Carregar fotos do servidor
         const existingPhotos = await defectInspectionReportAPI.getPhotos(reportId);
-
-        // ✅ LOG 1: Quantas fotos foram recebidas
-        console.log('📸 ========== LOADING PHOTOS ==========');
-        console.log('📸 existingPhotos received:', existingPhotos?.length || 0);
-        if (existingPhotos && existingPhotos.length > 0) {
-          console.log('📸 First photo sample:', {
-            fileId: existingPhotos[0].fileId,
-            hash: existingPhotos[0].hash,
-            downloadUrl: existingPhotos[0].downloadUrl,
-          });
-        }
 
         const initialPhotos: PhotoData[] = Array.from({ length: 8 }, (_, i) => {
           const pageNumber = i < 4 ? 2 : 3;
           const position = (i % 4) + 1;
-          const existingPhoto = existingPhotos?.[i];  // ✅ Optional chaining
+          const existingPhoto = existingPhotos[i];
 
           if (existingPhoto) {
             const baseUrlClean = API_CONFIG.baseUrl.replace('/api/', '');
-
-            // ✅ CORREÇÃO: Garantir que downloadUrl tem barra inicial
-            let correctPath = existingPhoto.downloadUrl;
-            if (!correctPath.startsWith('/')) {
-              correctPath = '/' + correctPath;
-            }
-
-            // Corrigir o caminho para usar endpoint mobile
-            correctPath = correctPath.replace(
-              '/reports/files/download/',
-              '/reports/mobile/files/download/'
+            const correctPath = existingPhoto.downloadUrl.replace(
+              '/api/reports/files/download/',
+              '/api/reports/mobile/files/download/'
             );
-
             const fullImageUrl = correctPath.startsWith('http')
               ? correctPath
               : `${baseUrlClean}${correctPath}`;
 
-            // ✅ LOG: Verificar URL final
-            console.log(`📸 Photo ${i + 1} loaded:`, {
-              fileId: existingPhoto.fileId,
-              hash: existingPhoto.hash?.substring(0, 8) + '...',
-              originalUrl: existingPhoto.downloadUrl,
-              correctedPath: correctPath,
-              fullUrl: fullImageUrl,
-            });
-
             return {
-              id: String(existingPhoto.fileId),  // ✅ MUDANÇA: usar fileId como id
+              id: `photo-${i}`,
               uri: fullImageUrl,
               pageNumber,
               position,
@@ -311,9 +236,6 @@ export default function DefectInspectionReportEditScreen() {
               description: existingPhoto.description ?? '',
             };
           }
-
-          // ✅ LOG 3: Slots vazios
-          console.log(`📸 Photo ${i + 1}: empty slot`);
 
           return {
             id: `photo-${i}`,
@@ -329,14 +251,6 @@ export default function DefectInspectionReportEditScreen() {
 
         setPhotos(initialPhotos);
 
-        // ✅ LOG 4: Resumo final
-        console.log('✅ Photos state set:', {
-          total: initialPhotos.length,
-          withPhotos: initialPhotos.filter(p => p.uri && p.uri !== '').length,
-          emptySlots: initialPhotos.filter(p => !p.uri || p.uri === '').length,
-        });
-        console.log('📸 ========================================');
-
         // Carregar campos adicionais
         const fields: AdditionalField[] = [];
         for (let i = 1; i <= 7; i++) {
@@ -351,38 +265,6 @@ export default function DefectInspectionReportEditScreen() {
         console.log('✅ Relatório online carregado');
         return;
       }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
       // ========================================
       // MODO 4: Offline e tentou carregar relatório online
@@ -941,47 +823,29 @@ export default function DefectInspectionReportEditScreen() {
         </Card>
 
         {/* Fotografias - Página 2 */}
-        {/* Fotografias - Página 2 */}
         <Card style={styles.card}>
           <Card.Title title="Fotografias - Página 2" />
           <Card.Content>
             <View style={styles.photosGrid}>
-              {photos.slice(0, 4).map((photo, index) => {
-                // ✅ LOG: Verificar o que está a ser renderizado
-                console.log(`🖼️ RENDER Photo ${index + 1}:`, {
-                  id: photo.id,
-                  hasUri: !!photo.uri,
-                  uri: photo.uri?.substring(0, 60) + '...',
-                  fileId: photo.fileId,
-                });
-
-                return (
-                  <TouchableOpacity
-                    key={photo.id}
-                    style={styles.photoSlot}
-                    onPress={() => {
-                      setSelectedPhotoIndex(index);
-                      setPhotoDialogVisible(true);
-                    }}
-                  >
-                    {photo.uri ? (
-                      <Image
-                        source={{ uri: photo.uri }}
-                        style={styles.photoImage}
-                        // ✅ ADICIONAR: Callbacks de debug
-                        onLoadStart={() => console.log(`📥 Loading image ${index + 1}...`)}
-                        onLoad={() => console.log(`✅ Image ${index + 1} loaded successfully`)}
-                        onError={(error) => console.log(`❌ Image ${index + 1} failed:`, error.nativeEvent)}
-                      />
-                    ) : (
-                      <View style={styles.photoPlaceholder}>
-                        <IconButton icon="camera-plus" size={32} iconColor={colors.disabled} />
-                        <Text style={styles.photoLabel}>Posição {photo.position}</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
+              {photos.slice(0, 4).map((photo, index) => (
+                <TouchableOpacity
+                  key={photo.id}
+                  style={styles.photoSlot}
+                  onPress={() => {
+                    setSelectedPhotoIndex(index);
+                    setPhotoDialogVisible(true);
+                  }}
+                >
+                  {photo.uri ? (
+                    <Image source={{ uri: photo.uri }} style={styles.photoImage} />
+                  ) : (
+                    <View style={styles.photoPlaceholder}>
+                      <IconButton icon="camera-plus" size={32} iconColor={colors.disabled} />
+                      <Text style={styles.photoLabel}>Posição {photo.position}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
             </View>
           </Card.Content>
         </Card>
@@ -991,41 +855,25 @@ export default function DefectInspectionReportEditScreen() {
           <Card.Title title="Fotografias - Página 3" />
           <Card.Content>
             <View style={styles.photosGrid}>
-              {photos.slice(4, 8).map((photo, index) => {
-                // ✅ LOG: Verificar o que está a ser renderizado
-                console.log(`🖼️ RENDER Photo ${index + 5}:`, {
-                  id: photo.id,
-                  hasUri: !!photo.uri,
-                  uri: photo.uri?.substring(0, 60) + '...',
-                  fileId: photo.fileId,
-                });
-
-                return (
-                  <TouchableOpacity
-                    key={photo.id}
-                    style={styles.photoSlot}
-                    onPress={() => {
-                      setSelectedPhotoIndex(index + 4);
-                      setPhotoDialogVisible(true);
-                    }}
-                  >
-                    {photo.uri ? (
-                      <Image
-                        source={{ uri: photo.uri }}
-                        style={styles.photoImage}
-                        onLoadStart={() => console.log(`📥 Loading image ${index + 5}...`)}
-                        onLoad={() => console.log(`✅ Image ${index + 5} loaded successfully`)}
-                        onError={(error) => console.log(`❌ Image ${index + 5} failed:`, error.nativeEvent)}
-                      />
-                    ) : (
-                      <View style={styles.photoPlaceholder}>
-                        <IconButton icon="camera-plus" size={32} iconColor={colors.disabled} />
-                        <Text style={styles.photoLabel}>Posição {photo.position}</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
+              {photos.slice(4, 8).map((photo, index) => (
+                <TouchableOpacity
+                  key={photo.id}
+                  style={styles.photoSlot}
+                  onPress={() => {
+                    setSelectedPhotoIndex(index + 4);
+                    setPhotoDialogVisible(true);
+                  }}
+                >
+                  {photo.uri ? (
+                    <Image source={{ uri: photo.uri }} style={styles.photoImage} />
+                  ) : (
+                    <View style={styles.photoPlaceholder}>
+                      <IconButton icon="camera-plus" size={32} iconColor={colors.disabled} />
+                      <Text style={styles.photoLabel}>Posição {photo.position}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
             </View>
           </Card.Content>
         </Card>
