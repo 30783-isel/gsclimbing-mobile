@@ -8,8 +8,6 @@ import { useProjects } from '@/hooks/useProjects';
 import { useOfflineProjects } from '@/hooks/useOfflineProjects.hook';
 import { ProjectFormSheet } from '@/components/ProjectFormSheet';
 import { FiltersSheet } from '@/components/FiltersSheet';
-import { SyncStatus } from '@/components/SyncStatus';
-import { OfflineSyncIndicator } from '@/components/OfflineSyncIndicator.component';
 import { colors, spacing } from '@/constants/theme';
 import type { Project, ProjectFilters } from '@/types/project.types';
 import NetInfo from '@react-native-community/netinfo';
