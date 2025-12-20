@@ -28,6 +28,7 @@ export interface PhotoData {
   timestamp: number;
   isUploaded: boolean;
   fileId?: string; // ID retornado pelo backend após upload
+  replacedFileId?: string;
 }
 
 export interface AdditionalField {
