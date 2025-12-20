@@ -119,50 +119,96 @@ export default function DefectInspectionReportEditScreen() {
       // ========================================
       // MODO 1: Relatório offline (via tempId)
       // ========================================
-      if (tempIdParam) {
-        console.log('📵 Carregando relatório offline:', tempIdParam);
-        const offlineReport = await offlineReportsService.getById(tempIdParam);
+if (tempIdParam) {
+    console.log('📵 Carregando relatório offline:', tempIdParam);
+    const offlineReport = await offlineReportsService.getById(tempIdParam);
 
-        if (!offlineReport) {
-          Alert.alert('Erro', 'Relatório offline não encontrado');
-          router.back();
-          return;
-        }
-
-        setIsOfflineMode(true);
-        setTempId(offlineReport.tempId);
-
-        // Preencher formulário
-        setSite(offlineReport.data.site || '');
-        setWtgNumber(offlineReport.data.wtgNumber || '');
-        setWtgType(offlineReport.data.wtgType || '');
-        setYearConstruction(offlineReport.data.yearConstruction || '');
-
-        // Carregar fotos offline
-        const offlinePhotos: PhotoData[] = Array.from({ length: 8 }, (_, i) => {
-          const offlinePhoto = offlineReport.photos[i];
-          return {
-            id: `photo-${i}`,
-            uri: offlinePhoto?.uri || '',
-            pageNumber: i < 4 ? 2 : 3,
-            position: (i % 4) + 1,
-            timestamp: Date.now(),
-            isUploaded: false,
-            description: offlinePhoto?.filename ?? '',
-          };
-        });
-        setPhotos(offlinePhotos);
-
-        // Carregar campos adicionais
-        const fields: AdditionalField[] = Object.keys(offlineReport.data)
-          .filter(key => key.startsWith('additionalField'))
-          .map(key => offlineReport.data[key])
-          .filter(field => field && field.label && field.value);
-        setAdditionalFields(fields);
-
-        console.log('✅ Relatório offline carregado');
+    if (!offlineReport) {
+        Alert.alert('Erro', 'Relatório offline não encontrado');
+        router.back();
         return;
-      }
+    }
+
+    setIsOfflineMode(true);
+    setTempId(offlineReport.tempId);
+
+    // Preencher formulário
+    setSite(offlineReport.data.site || '');
+    setWtgNumber(offlineReport.data.wtgNumber || '');
+    setWtgType(offlineReport.data.wtgType || '');
+    setYearConstruction(offlineReport.data.yearConstruction || '');
+
+    // ✅ CORREÇÃO: Carregar fotos offline CORRETAMENTE
+    // Criar array de 8 fotos vazias primeiro
+    const offlinePhotos: PhotoData[] = Array.from({ length: 8 }, (_, i) => ({
+        id: `photo-${i}`,
+        uri: '',
+        pageNumber: i < 4 ? 2 : 3,
+        position: (i % 4) + 1,
+        timestamp: Date.now(),
+        isUploaded: false,
+        description: '',
+    }));
+
+    // ✅ Mapear cada foto offline para a posição correta
+    if (offlineReport.photos && offlineReport.photos.length > 0) {
+        console.log(`📸 Carregando ${offlineReport.photos.length} fotos offline`);
+        
+        offlineReport.photos.forEach((offlinePhoto) => {
+            // ✅ IMPORTANTE: As fotos offline têm filename como "photo_page2_pos3.jpg"
+            // Precisamos extrair pageNumber e position do filename
+            const filenameMatch = offlinePhoto.filename.match(/photo_page(\d+)_pos(\d+)\.jpg/);
+            
+            if (filenameMatch) {
+                const pageNumber = parseInt(filenameMatch[1], 10);
+                const position = parseInt(filenameMatch[2], 10);
+                
+                // Calcular o índice correto no array (0-7)
+                // Página 2: posições 1-4 → índices 0-3
+                // Página 3: posições 1-4 → índices 4-7
+                const index = pageNumber === 2 
+                    ? (position - 1)           // Página 2: pos 1→0, pos 2→1, pos 3→2, pos 4→3
+                    : (position - 1 + 4);      // Página 3: pos 1→4, pos 2→5, pos 3→6, pos 4→7
+                
+                if (index >= 0 && index < 8) {
+                    offlinePhotos[index] = {
+                        id: `photo-${index}`,
+                        uri: offlinePhoto.uri || '',
+                        pageNumber,
+                        position,
+                        timestamp: Date.now(),
+                        isUploaded: false,
+                        description: offlinePhoto.filename || '',
+                    };
+                    
+                    console.log(`✅ Foto carregada: Página ${pageNumber}, Posição ${position} → Índice ${index}`);
+                }
+            } else {
+                console.warn('⚠️ Filename não reconhecido:', offlinePhoto.filename);
+            }
+        });
+    }
+    
+    setPhotos(offlinePhotos);
+
+    // Carregar campos adicionais
+    const fields: AdditionalField[] = [];
+    if (offlineReport.data.additionalFields) {
+        Object.entries(offlineReport.data.additionalFields).forEach(([key, field]) => {
+            if (field && typeof field === 'object' && 'label' in field && 'value' in field) {
+                fields.push({
+                    label: (field as any).label,
+                    value: (field as any).value
+                });
+            }
+        });
+    }
+    setAdditionalFields(fields);
+
+    console.log('✅ Relatório offline carregado');
+    setLoading(false);
+    return;
+}
 
       // ========================================
       // MODO 2: Criar novo relatório (reportId === 0)
