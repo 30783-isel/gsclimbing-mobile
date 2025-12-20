@@ -31,7 +31,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { colors, spacing } from '@/constants/theme';
 import { defectInspectionReportAPI } from '@/services/api/defectInspectionReport.api';
 import { reportPhotosAPI, type ReportPhotoData } from '@/services/api/reportPhotos.api';
-import { PhotoGallery } from '@/components/PhotoGallery';
+import { PhotoGallery } from '@/components/common/PhotoGallery';
 import Toast from 'react-native-toast-message';
 import { useAuthStore } from '@/store/authStore';
 import { DefectInspectionReportResponse } from '@/types/defectInspectionReport.types';

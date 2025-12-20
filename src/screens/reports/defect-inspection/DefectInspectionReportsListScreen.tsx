@@ -40,7 +40,7 @@ import { offlineReportsService, OfflineReport } from '@/services/storage/offline
 import { reportSyncService } from '@/services/sync/reportSync.service';
 import { ReportType } from '@/types/report.types';
 import type { DefectInspectionReportResponse } from '@/types/defectInspectionReport.types';
-import { SyncDebugOverlay } from '@/components/SyncDebugOverlay';
+import { SyncDebugOverlay } from '@/components/common/SyncDebugOverlay';
 import { useAuthStore } from '@/store/authStore';
 
 export default function DefectInspectionReportsListScreen() {

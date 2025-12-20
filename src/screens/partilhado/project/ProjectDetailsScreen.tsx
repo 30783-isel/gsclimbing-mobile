@@ -6,7 +6,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useProjects } from '@/hooks/useProjects';
 import { useTurbines } from '@/hooks/useTurbines';
-import { TurbineFormSheet } from '@/components/TurbineFormSheet';
+import { TurbineFormSheet } from '@/components/common/TurbineFormSheet';
 import { colors, spacing } from '@/constants/theme';
 import type { Turbine } from '@/types/turbine.types';
 import Toast from 'react-native-toast-message';

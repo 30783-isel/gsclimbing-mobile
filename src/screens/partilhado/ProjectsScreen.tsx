@@ -5,8 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useProjects } from '@/hooks/useProjects';
 import { useOfflineProjects } from '@/hooks/useOfflineProjects.hook';
-import { ProjectFormSheet } from '@/components/ProjectFormSheet';
-import { FiltersSheet } from '@/components/FiltersSheet';
+import { ProjectFormSheet } from '@/components/common/ProjectFormSheet';
+import { FiltersSheet } from '@/components/common/FiltersSheet';
 
 import { colors, spacing } from '@/constants/theme';
 import type { Project, ProjectFilters } from '@/types/project.types';
