@@ -446,52 +446,98 @@ export default function PerformanceRepairElevatorEditScreen() {
             };
 
             if (reportId === 0) {
-                console.log('📝 Creating new report...');
-                const result = await performanceRepairElevatorAPI.create(baseData);
-                savedReportUuid = result.uuid;
-                savedReportId = result.reportId;
-                setReportUuid(result.uuid);
-                console.log('✅ Report created:', result.reportId, result.uuid);
+                try {
+                    console.log('📝 Creating new report...');
+                    const result = await performanceRepairElevatorAPI.create(baseData);
+                    savedReportUuid = result.uuid;
+                    savedReportId = result.reportId;
+                    setReportUuid(result.uuid);
+                    console.log('✅ Report created:', result.reportId, result.uuid);
 
-                const photosToUpload = photos.filter(p => p.uri && !p.isUploaded);
+                    const photosToUpload = photos.filter(p => p.uri && !p.isUploaded);
 
-                if (photosToUpload.length > 0) {
-                    console.log(`📸 Uploading ${photosToUpload.length} photos...`);
-                    const uploadedPhotos = [...photos];
-                    const uploadedPhotoIds: string[] = [];
+                    if (photosToUpload.length > 0) {
+                        console.log(`📸 Uploading ${photosToUpload.length} photos...`);
+                        const uploadedPhotos = [...photos];
+                        const uploadedPhotoIds: string[] = [];
 
-                    for (let i = 0; i < photos.length; i++) {
-                        const photo = photos[i];
-                        if (photo.uri && !photo.isUploaded) {
-                            console.log(`📤 Uploading photo ${i + 1}...`);
-                            try {
-                                const uploaded = await performanceRepairElevatorAPI.uploadPhoto(photo, savedReportUuid);
-                                uploadedPhotos[i] = {
-                                    ...photo,
-                                    fileId: String(uploaded.fileId),
-                                    isUploaded: true,
-                                };
-                                uploadedPhotoIds.push(String(uploaded.fileId));
-                                console.log(`✅ Photo ${i + 1} uploaded:`, uploaded.fileId);
-                            } catch (photoError) {
-                                console.error(`❌ Error uploading photo ${i + 1}:`, photoError);
+                        for (let i = 0; i < photos.length; i++) {
+                            const photo = photos[i];
+                            if (photo.uri && !photo.isUploaded) {
+                                console.log(`📤 Uploading photo ${i + 1}...`);
+                                try {
+                                    const uploaded = await performanceRepairElevatorAPI.uploadPhoto(photo, savedReportUuid);
+                                    uploadedPhotos[i] = {
+                                        ...photo,
+                                        fileId: String(uploaded.fileId),
+                                        isUploaded: true,
+                                    };
+                                    uploadedPhotoIds.push(String(uploaded.fileId));
+                                    console.log(`✅ Photo ${i + 1} uploaded:`, uploaded.fileId);
+                                } catch (photoError) {
+                                    console.error(`❌ Error uploading photo ${i + 1}:`, photoError);
+                                }
                             }
                         }
-                    }
 
-                    if (uploadedPhotoIds.length > 0) {
-                        console.log('📝 Updating report with photo IDs...');
-                        const finalData: PerformanceRepairElevatorData = {
-                            ...baseData,
-                            photos: uploadedPhotos,
-                        };
-                        await performanceRepairElevatorAPI.update(savedReportId, finalData);
-                        console.log('✅ Report updated with photos');
-                    }
+                        if (uploadedPhotoIds.length > 0) {
+                            console.log('📝 Updating report with photo IDs...');
+                            const finalData: PerformanceRepairElevatorData = {
+                                ...baseData,
+                                photos: uploadedPhotos,
+                            };
+                            await performanceRepairElevatorAPI.update(savedReportId, finalData);
+                            console.log('✅ Report updated with photos');
+                        }
 
-                    setPhotos(uploadedPhotos);
+                        setPhotos(uploadedPhotos);
+                    }
+                } catch (error: any) {
+                    console.error('❌ Error saving report:', error);
+
+                    // ✅ SE FOR ERRO DE OFFLINE, guardar localmente
+                    if (error.code === 'OFFLINE' || error.message === 'Sem conexão à Internet') {
+                        console.log('📵 httpClient bloqueou → Guardar offline');
+                        Alert.alert(
+                            'Conexão Perdida',
+                            'A conexão foi perdida. Relatório será guardado offline.',
+                            [{ text: 'OK' }]
+                        );
+
+                        // Guardar offline como fallback
+                        const offlinePhotos = photos
+                            .filter(p => p.uri && p.uri.trim() !== '')
+                            .map(p => ({
+                                tempId: p.id,
+                                uri: p.uri,
+                                filename: `photo_${p.position}.jpg`,
+                                mimeType: 'image/jpeg',
+                                description: p.description || '',
+                            }));
+
+                        await offlinePerformanceReportsService.create({
+                            projectId: projectId || 0,
+                            turbineId: turbineId,
+                            reportType: 1,
+                            data: reportData,
+                            photos: offlinePhotos,
+                        });
+
+                        Toast.show({
+                            type: 'info',
+                            text1: '📵 Guardado Offline',
+                            text2: 'Conexão perdida durante o save',
+                            visibilityTime: 4000,
+                        });
+
+                        router.back();
+                    } else {
+                        // Outros erros
+                        Alert.alert('Erro', error?.message || 'Erro ao guardar relatório');
+                    }
+                } finally {
+                    setSaving(false);
                 }
-
             } else {
                 console.log('📝 Updating existing report...');
 
