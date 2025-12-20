@@ -73,7 +73,7 @@ export const SyncDebugOverlay: React.FC = () => {
 
   // Monitor sincronização
   useEffect(() => {
-    const removeListener = reportSyncService.addSyncListener((summary) => {
+    const removeListener = reportSyncService.addSyncListener(() => {
       setIsSyncing(false);
     });
 

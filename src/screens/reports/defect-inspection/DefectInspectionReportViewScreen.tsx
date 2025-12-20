@@ -31,14 +31,14 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { colors, spacing } from '@/constants/theme';
 import { defectInspectionReportAPI } from '@/services/api/defectInspectionReport.api';
 import { reportPhotosAPI, type ReportPhotoData } from '@/services/api/reportPhotos.api';
-import type { DefectInspectionReportResponse } from '@/reports/defectInspectionReport/defectInspectionReport.types';
 import { PhotoGallery } from '@/components/PhotoGallery';
 import Toast from 'react-native-toast-message';
 import { useAuthStore } from '@/store/authStore';
+import { DefectInspectionReportResponse } from '@/types/defectInspectionReport.types';
 
 export default function DefectInspectionReportViewScreen() {
   const router = useRouter();
-  const { reportId, turbineName, projectName } = useLocalSearchParams<{
+  const { reportId } = useLocalSearchParams<{
     reportId: string;
     turbineName: string;
     projectName: string;
@@ -226,8 +226,9 @@ export default function DefectInspectionReportViewScreen() {
           size={24}
           iconColor={colors.white}
           onPress={() => {
+            const role = userRole ?? 'tech';
             router.push({
-              pathname: `/(tabs)/${userRole.toLowerCase()}/reports/defect-inspection/${reportId}/history` as any,
+              pathname: `/(tabs)/${role.toLowerCase()}/reports/defect-inspection/${reportId}/history` as any,
               params: {
                 reportId: reportId.toString(),
                 reportTitle: `#${reportId} - ${report.wtgNumber}`,
@@ -325,8 +326,9 @@ export default function DefectInspectionReportViewScreen() {
                 {...props}
                 icon="arrow-right"
                 onPress={() => {
+                  const role = userRole ?? 'tech';
                   router.push({
-                    pathname: `/(tabs)/${userRole.toLowerCase()}/reports/defect-inspection/${reportId}/history` as any,
+                    pathname: `/(tabs)/${role.toLowerCase()}/reports/defect-inspection/${reportId}/history` as any,
                     params: {
                       reportId: reportId.toString(),
                       reportTitle: `#${reportId} - ${report.wtgNumber}`,

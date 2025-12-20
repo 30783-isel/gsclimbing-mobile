@@ -3,9 +3,9 @@ import { useState, useEffect } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import { reportsCacheService } from '@/services/storage/reportsCacheService';
 import { defectInspectionReportAPI } from '@/services/api/defectInspectionReport.api';
-
+import { DefectInspectionReportResponse } from '@/types/defectInspectionReport.types';
 export function useOfflineReports(turbineId: number) {
-  const [reports, setReports] = useState<any[]>([]);
+  const [reports, setReports] = useState<DefectInspectionReportResponse[]>([]);
   const [isOnline, setIsOnline] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

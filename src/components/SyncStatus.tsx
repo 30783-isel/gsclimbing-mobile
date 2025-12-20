@@ -5,7 +5,7 @@ import { useSync } from '@/hooks/useSync';
 import { colors, spacing } from '@/constants/theme';
 
 export const SyncStatus: React.FC = () => {
-  const { isOnline, isSyncing, queueSize, lastSync, syncNow, clearOfflineData } = useSync();
+  const { isOnline, isSyncing, queueSize, lastSync, syncNow } = useSync();
   const [dialogVisible, setDialogVisible] = React.useState(false);
 
   const getStatusColor = () => {

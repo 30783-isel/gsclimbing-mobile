@@ -53,7 +53,6 @@ export default function DefectInspectionReportsListScreen() {
   const router = useRouter();
   const { role: userRole } = useAuthStore();
 
-  const [onlineReports, setOnlineReports] = useState<DefectInspectionReportResponse[]>([]);
   const [offlineReports, setOfflineReports] = useState<OfflineReport[]>([]);
   const [combinedReports, setCombinedReports] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -162,7 +161,6 @@ export default function DefectInspectionReportsListScreen() {
         return dateB - dateA;
       });
 
-      setOnlineReports(onlineReportsData);
       setOfflineReports(offlineReportsData);
       setCombinedReports(combined);
 
@@ -340,8 +338,9 @@ export default function DefectInspectionReportsListScreen() {
                   <Menu.Item
                     onPress={() => {
                       toggleMenu(menuId);
+                      const role = userRole ?? 'tech';
                       router.push({
-                        pathname: `/(tabs)/${userRole.toLowerCase()}/reports/defect-inspection/${item.reportId}/history` as any,
+                        pathname: `/(tabs)/${role.toLowerCase()}/reports/defect-inspection/${item.reportId}/history` as any,
                         params: {
                           reportId: item.reportId.toString(),
                           reportTitle: `#${item.reportId} - ${item.wtgNumber}`,

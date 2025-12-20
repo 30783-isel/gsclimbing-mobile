@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { projectsAPI } from '@/services/api/projects.api';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { Text, Card, IconButton, FAB, Chip, Portal, Dialog, Button } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Text, Card, IconButton, FAB, Portal, Dialog, Button } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useProjects } from '@/hooks/useProjects';
@@ -110,7 +110,6 @@ export default function ProjectDetailsScreen() {
   const handleTurbineFormSubmit = async (data: any) => {
     try {
       if (turbineSheetMode === 'create') {
-        const newTurbine = await projectsAPI.addTurbine(id);
         Toast.show({
           type: 'success',
           text1: 'Sucesso',

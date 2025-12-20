@@ -3,11 +3,11 @@ import { View, StyleSheet, FlatList, RefreshControl, TouchableOpacity } from 're
 import { Text, Card, FAB, Searchbar, Chip, IconButton, Banner } from 'react-native-paper';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@/hooks/useAuth';
 import { useProjects } from '@/hooks/useProjects';
 import { useOfflineProjects } from '@/hooks/useOfflineProjects.hook';
 import { ProjectFormSheet } from '@/components/ProjectFormSheet';
 import { FiltersSheet } from '@/components/FiltersSheet';
+
 import { colors, spacing } from '@/constants/theme';
 import type { Project, ProjectFilters } from '@/types/project.types';
 import NetInfo from '@react-native-community/netinfo';
@@ -19,7 +19,6 @@ interface ProjectsScreenProps {
 export default function ProjectsScreen({ userRole }: ProjectsScreenProps) {
   const { t } = useTranslation();
   const router = useRouter();
-  const { user, handleLogout } = useAuth();
   
   // ========== HOOKS OFFLINE ==========
   // Hook offline - tem prioridade sobre dados online
@@ -33,7 +32,6 @@ export default function ProjectsScreen({ userRole }: ProjectsScreenProps) {
   const {
     projects: onlineProjects,
     isLoading,
-    refreshing,
     loadProjects,
     refreshProjects,
     setSelectedProject,
