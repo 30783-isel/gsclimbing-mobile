@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Text, Card, IconButton, Chip, Portal, Dialog, Button, Banner } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { projectsAPI } from '@/services/api/projects.api';
 import { dataCacheService } from '@/services/storage/dataCache.service';
@@ -23,7 +22,6 @@ const CACHE_KEYS = {
 export default function TurbineDetailsScreen() {
   const { id, turbineId } = useLocalSearchParams<{ id: string; turbineId: string }>();
   const router = useRouter();
-  const { t } = useTranslation();
   const { role } = useAuthStore();
   
   const [turbine, setTurbine] = useState<Turbine | null>(null);
