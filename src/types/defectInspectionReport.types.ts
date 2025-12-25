@@ -27,7 +27,8 @@ export interface PhotoData {
   isUploaded: boolean;
   fileId?: string;
   description: string;
-  replacedFileId?: string;  // ✅ NOVO: ID da foto que foi substituída
+  fileId?: string; // ID retornado pelo backend após upload
+  replacedFileId?: string;
 }
 
 export interface AdditionalField {

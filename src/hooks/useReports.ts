@@ -2,7 +2,6 @@ import { useCallback } from 'react';
 import { useReportStore } from '@/store/reportStore';
 import { reportsAPI } from '@/services/api/reports.api';
 import Toast from 'react-native-toast-message';
-import * as FileSystem from 'expo-file-system';
 import type { CreateReportDTO, ReportPhoto } from '@/types/report.types';
 
 /**

@@ -3,10 +3,11 @@ import { useState, useEffect } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import { dataCacheService } from '@/services/storage/dataCache.service';
 import { useAuth } from '@/hooks/useAuth';
+import { Project } from '@/types';
 
 export function useOfflineProjects() {
   const { user } = useAuth();
-  const [projects, setProjects] = useState([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [isOnline, setIsOnline] = useState(true);
   const [loading, setLoading] = useState(true);
 
@@ -53,7 +54,7 @@ export function useOfflineProjects() {
 }
 
 export function useOfflineTurbines(projectId: number) {
-  const [turbines, setTurbines] = useState([]);
+  const [turbines, setTurbines] = useState<any[]>([]);
   const [isOnline, setIsOnline] = useState(true);
   const [loading, setLoading] = useState(true);
 
@@ -96,7 +97,7 @@ export function useOfflineTurbines(projectId: number) {
 }
 
 export function useOfflineReports(turbineId: number) {
-  const [reports, setReports] = useState([]);
+  const [reports, setReports] = useState<any[]>([]);
   const [isOnline, setIsOnline] = useState(true);
   const [loading, setLoading] = useState(true);
 

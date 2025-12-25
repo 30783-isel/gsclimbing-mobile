@@ -47,8 +47,8 @@ import type {
 import { API_CONFIG } from '@/constants/api';
 // ✅ ADICIONAR estas 3 linhas
 import Toast from 'react-native-toast-message';
-import { offlinePerformanceReportsService } from '@/services/storage/offlinePerformanceReports.service';
-import { performanceReportSyncService } from '@/services/sync/performanceReportSync.service';
+import { offlineReportsService } from '@/services/storage/offlineReports.service';
+import { ReportType } from '@/types';
 
 export default function PerformanceRepairElevatorEditScreen() {
     const router = useRouter();
@@ -72,8 +72,8 @@ export default function PerformanceRepairElevatorEditScreen() {
     const [saving, setSaving] = useState(false);
     const [isOnline, setIsOnline] = useState(true);
     const [reportUuid, setReportUuid] = useState<string>('');
-    const [isOfflineMode, setIsOfflineMode] = useState(false);
-    const [tempId, setTempId] = useState<string | null>(null);
+    const [, setIsOfflineMode] = useState<boolean>(false);
+    const [, setTempId] = useState<string | null>(null);
 
     // Página 1: Dados Fundamentais
     const [site, setSite] = useState('');
@@ -124,8 +124,7 @@ export default function PerformanceRepairElevatorEditScreen() {
             // MODO OFFLINE: Carregar relatório via tempId
             if (tempIdParam) {
                 console.log('📵 Carregando relatório offline:', tempIdParam);
-                const offlineReport = await offlinePerformanceReportsService.getById(tempIdParam);
-
+                const offlineReport = await offlineReportsService.getById(tempIdParam);
                 if (!offlineReport) {
                     Alert.alert('Erro', 'Relatório offline não encontrado');
                     router.back();
@@ -157,7 +156,7 @@ export default function PerformanceRepairElevatorEditScreen() {
                         position: i + 1,
                         timestamp: Date.now(),
                         isUploaded: false,
-                        description: offlinePhoto?.description || '',
+                        description: offlinePhoto?.filename || '',
                     };
                 });
                 setPhotos(offlinePhotos);
@@ -165,7 +164,7 @@ export default function PerformanceRepairElevatorEditScreen() {
                 // Carregar campos adicionais
                 const fields: AdditionalField[] = [];
                 if (offlineReport.data.additionalFields) {
-                    Object.entries(offlineReport.data.additionalFields).forEach(([key, field]) => {
+                    Object.entries(offlineReport.data.additionalFields).forEach(([field]) => {
                         if (field && typeof field === 'object' && 'label' in field && 'value' in field) {
                             fields.push({
                                 label: (field as any).label,
@@ -352,41 +351,6 @@ export default function PerformanceRepairElevatorEditScreen() {
             // ✅ USAR O ESTADO EXISTENTE (já monitorizado pelo useEffect)
             console.log(`🌐 Conexão: ${isOnline ? 'ONLINE' : 'OFFLINE'}`);
 
-            // ✅ PREPARAR DADOS
-            const reportData: {
-                site: string;
-                wtgNumber: string;
-                wtgType: string;
-                yearConstruction: string;
-                inpectorsWorkers?: string;
-                workCompleted?: 'Yes' | 'No';
-                turbineOperable?: 'Yes' | 'No';
-                performanceReport?: string;
-                additionalFields?: Record<string, { label: string; value: string }>;
-            } = {
-                site,
-                wtgNumber,
-                wtgType,
-                yearConstruction,
-                inpectorsWorkers: inspectors || undefined,
-                workCompleted: (workCompleted === 'yes' ? 'Yes' :
-                    workCompleted === 'no' ? 'No' :
-                        undefined) as 'Yes' | 'No' | undefined,
-                turbineOperable: (windturbineOperable === 'yes' ? 'Yes' :
-                    windturbineOperable === 'no' ? 'No' :
-                        undefined) as 'Yes' | 'No' | undefined,
-                performanceReport: performanceReport || undefined,
-                additionalFields: additionalFields.length > 0
-                    ? additionalFields.reduce((acc, field, index) => {
-                        acc[`additionalField${index + 1}`] = {
-                            label: field.label,
-                            value: field.value
-                        };
-                        return acc;
-                    }, {} as Record<string, { label: string; value: string }>)
-                    : undefined,
-            };
-
             // ✅ MODO OFFLINE - Verificar ANTES de qualquer chamada API
             if (!isOnline) {
                 console.log('📵 OFFLINE → Guardar localmente');
@@ -401,11 +365,21 @@ export default function PerformanceRepairElevatorEditScreen() {
                         description: p.description || '',
                     }));
 
-                const offlineReport = await offlinePerformanceReportsService.create({
+                const offlineReport = await offlineReportsService.create({
                     projectId: projectId || 0,
-                    turbineId: turbineId,
-                    reportType: 1,
-                    data: reportData,
+                    turbineId: turbineId || 0,
+                    reportType: ReportType.DEFECT_INSPECTION,
+                    language: 'EN',
+                    data: {
+                        site,
+                        wtgNumber,
+                        wtgType,
+                        yearConstruction,
+                        dateInspection: new Date().toISOString().split('T')[0],
+                        inspectedBy: '',
+                        observations: '',
+                        ...additionalData,
+                    },
                     photos: offlinePhotos,
                 });
 
@@ -503,26 +477,6 @@ export default function PerformanceRepairElevatorEditScreen() {
                             'A conexão foi perdida. Relatório será guardado offline.',
                             [{ text: 'OK' }]
                         );
-
-                        // Guardar offline como fallback
-                        const offlinePhotos = photos
-                            .filter(p => p.uri && p.uri.trim() !== '')
-                            .map(p => ({
-                                tempId: p.id,
-                                uri: p.uri,
-                                filename: `photo_${p.position}.jpg`,
-                                mimeType: 'image/jpeg',
-                                description: p.description || '',
-                            }));
-
-                        await offlinePerformanceReportsService.create({
-                            projectId: projectId || 0,
-                            turbineId: turbineId,
-                            reportType: 1,
-                            data: reportData,
-                            photos: offlinePhotos,
-                        });
-
                         Toast.show({
                             type: 'info',
                             text1: '📵 Guardado Offline',
@@ -597,6 +551,16 @@ export default function PerformanceRepairElevatorEditScreen() {
         }
     };
 
+    // Preparar campos adicionais
+    const additionalData: Record<string, { label: string; value: string }> = {};
+    additionalFields.forEach((field, index) => {
+        if (field.label && field.value) {
+            additionalData[`additionalField${index + 1}`] = {
+                label: field.label,
+                value: field.value,
+            };
+        }
+    });
     // ====================================================================
     // EXPLICAÇÃO DA CORREÇÃO
     // ====================================================================
@@ -756,12 +720,6 @@ export default function PerformanceRepairElevatorEditScreen() {
         if (value === 'Yes') return 'yes';
         if (value === 'No') return 'no';
         return '';
-    };
-
-    const convertToUpperCase = (value: '' | 'yes' | 'no'): 'Yes' | 'No' | undefined => {
-        if (value === 'yes') return 'Yes';
-        if (value === 'no') return 'No';
-        return undefined;
     };
 
     // ====================================================================

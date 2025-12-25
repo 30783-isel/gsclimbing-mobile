@@ -116,7 +116,8 @@ export const HistoryTimeline: React.FC<HistoryTimelineProps> = ({ history }) => 
                   <View style={styles.photoChange}>
                     {(() => {
                       const isAdded = entry.fieldName === 'photo_added';
-                      const photoInfo = parsePhotoValue(isAdded ? entry.newValue : entry.oldValue);
+                      const value = isAdded ? entry.newValue : entry.oldValue;
+                      const photoInfo = parsePhotoValue(value ?? null);
                       
                       // Se não conseguir extrair hash, mostrar fallback (só texto)
                       if (!photoInfo) {

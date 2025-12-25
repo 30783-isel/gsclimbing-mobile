@@ -3,7 +3,7 @@ import { API_CONFIG } from '@/constants/api';
 import type {
   DefectInspectionReportDTO,
   DefectInspectionReportResponse,
-} from '@/reports/defectInspectionReport/defectInspectionReport.types';
+} from '@/types/defectInspectionReport.types';
 
 export interface ReportPhotoData {
   fileId: number;

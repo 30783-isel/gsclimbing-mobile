@@ -4,14 +4,12 @@ import * as ImagePicker from 'expo-image-picker';
 import type {
   DefectInspectionReportFormData,
   PhotoData,
-  AdditionalField,
   DefectInspectionReportDTO,
 } from '@/types/defectInspectionReport.types';
 import { defectInspectionReportAPI } from '@/services/api/defectInspectionReport.api';
 import { useAuthStore } from '@/store/authStore';
 
 const TOTAL_STEPS = 4;
-const MAX_PHOTOS = 8;
 const MAX_ADDITIONAL_FIELDS = 7;
 
 export const useDefectInspectionForm = (

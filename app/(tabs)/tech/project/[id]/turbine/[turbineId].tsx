@@ -5,4 +5,4 @@
  * Re-utiliza o mesmo componente que ADMIN
  */
 
-export { default } from '@/screens/partilhado/project/TurbineDetailsScreen';
+export { default } from '@/screens/common/project/TurbineDetailsScreen';

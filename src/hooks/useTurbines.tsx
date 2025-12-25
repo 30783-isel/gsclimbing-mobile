@@ -2,7 +2,6 @@ import { useCallback } from 'react';
 import { useProjectStore } from '@/store/projectStore';
 import { projectsAPI } from '@/services/api/projects.api';
 import Toast from 'react-native-toast-message';
-import type { CreateTurbineDTO, UpdateTurbineDTO } from '@/types/turbine.types';
 
 export const useTurbines = () => {
   const {

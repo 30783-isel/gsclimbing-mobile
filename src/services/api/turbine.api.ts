@@ -2,7 +2,7 @@
 
 import httpClient from '../httpClient';
 import { API_CONFIG } from '@/constants/api';
-import type { Turbine, CreateTurbineDTO, UpdateTurbineDTO, TurbineFilters } from '@/types/turbine.types';
+import type { Turbine, TurbineFilters } from '@/types/turbine.types';
 
 /**
  * API de Turbinas

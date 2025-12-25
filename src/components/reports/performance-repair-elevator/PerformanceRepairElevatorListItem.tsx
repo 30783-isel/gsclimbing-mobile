@@ -1,7 +1,7 @@
 // src/components/reports/performance-repair-elevator/PerformanceRepairElevatorListItem.tsx
 
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Card, Text, Chip, IconButton, Menu, Divider } from 'react-native-paper';
 import { colors, spacing } from '@/constants/theme';
 import type { Report } from '@/types/report.types';
