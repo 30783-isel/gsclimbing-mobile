@@ -273,8 +273,9 @@ class ReportSyncService {
       uri: photo.uri,
       type: photo.mimeType || 'image/jpeg',
       name: photo.filename,
+      fieldName: 'photoOne',
+      description: photo.filename,
     };
-    
     formData.append('file', fileObject as any);
 
     const uploadResponse = await httpClient.post(

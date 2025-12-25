@@ -279,6 +279,9 @@ class PerformanceReportSyncService {
               name: photo.filename || `photo_${i + 1}.jpg`,
             } as any);
 
+            formData.append('fieldName', 'photoOne');
+            formData.append('description', photo.description || '');
+
             const uploadResponse = await httpClient.post(
               `${API_CONFIG.baseMobileReportsUrl}performance-repair-elevator/${reportUuid}/upload-photo`,
               formData,

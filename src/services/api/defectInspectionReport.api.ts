@@ -126,7 +126,7 @@ export const defectInspectionReportAPI = {
       type: 'image/jpeg',
       name: filename,
     } as any);
-    
+    formData.append('fieldName', 'photoOne');
     formData.append('description', description);
 
     const response = await httpClient.post(
