@@ -198,8 +198,9 @@ export default function DefectInspectionReportEditScreen() {
             });
           }
         }
+        console.log('📋 Total de campos carregados:', fields.length); // ✅ ADICIONA ESTE LOG
         setAdditionalFields(fields);
-        setAdditionalFields(fields);
+
 
         console.log('✅ Relatório offline carregado');
         setLoading(false);
@@ -302,6 +303,7 @@ export default function DefectInspectionReportEditScreen() {
             fields.push({ label, value });
           }
         }
+        console.log('📋 Total de campos carregados:', fields.length); // ✅ ADICIONA ESTE LOG
         setAdditionalFields(fields);
 
         console.log('✅ Relatório online carregado');
@@ -430,6 +432,9 @@ export default function DefectInspectionReportEditScreen() {
             };
           }
         });
+        
+        console.log('📋 Campos adicionais preparados:', JSON.stringify(additionalData, null, 2));
+        console.log('📋 Número de campos:', Object.keys(additionalData).length);
 
         // A.1: Se está a EDITAR relatório offline existente
         if (isOfflineMode && tempId) {
@@ -528,6 +533,9 @@ export default function DefectInspectionReportEditScreen() {
           };
         }
       });
+
+      console.log('📋 Campos adicionais preparados:', JSON.stringify(additionalData, null, 2));
+      console.log('📋 Número de campos:', Object.keys(additionalData).length);
 
       if (reportId === 0) {
         // ========================================

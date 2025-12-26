@@ -130,7 +130,7 @@ export default function PerformanceRepairElevatorEditScreen() {
             if (tempIdParam) {
                 console.log('📵 Carregando relatório offline:', tempIdParam);
                 const offlineReport = await offlinePerformanceReportsService.getById(tempIdParam);
-                
+
                 if (!offlineReport) {
                     Alert.alert('Erro', 'Relatório offline não encontrado');
                     router.back();
@@ -176,6 +176,7 @@ export default function PerformanceRepairElevatorEditScreen() {
                         }
                     });
                 }
+                console.log('📋 Total de campos carregados:', fields.length); // ✅ ADICIONA ESTE LOG
                 setAdditionalFields(fields);
 
                 setLoading(false);
@@ -340,6 +341,9 @@ export default function PerformanceRepairElevatorEditScreen() {
                     }
                 });
 
+                console.log('📋 Campos adicionais preparados:', JSON.stringify(additionalData, null, 2));
+                console.log('📋 Número de campos:', Object.keys(additionalData).length);
+
                 const offlineReport = await offlinePerformanceReportsService.create({
                     projectId: projectId || 0,
                     turbineId: turbineId || 0,
@@ -396,6 +400,9 @@ export default function PerformanceRepairElevatorEditScreen() {
                     }
                 });
 
+                console.log('📋 Campos adicionais preparados:', JSON.stringify(additionalData, null, 2));
+                console.log('📋 Número de campos:', Object.keys(additionalData).length);
+
                 await offlinePerformanceReportsService.update(tempId, {
                     data: {
                         site,
@@ -434,6 +441,9 @@ export default function PerformanceRepairElevatorEditScreen() {
                 }
             });
 
+            console.log('📋 Campos adicionais preparados:', JSON.stringify(additionalData, null, 2));
+            console.log('📋 Número de campos:', Object.keys(additionalData).length);
+            
             const baseData: PerformanceRepairElevatorData = {
                 site,
                 wtgNumber,
