@@ -189,16 +189,16 @@ export default function DefectInspectionReportEditScreen() {
 
         // Carregar campos adicionais
         const fields: AdditionalField[] = [];
-        if (offlineReport.data.additionalFields) {
-          Object.entries(offlineReport.data.additionalFields).forEach(([_, field]) => {
-            if (field && typeof field === 'object' && 'label' in field && 'value' in field) {
-              fields.push({
-                label: (field as any).label,
-                value: (field as any).value
-              });
-            }
-          });
+        for (let i = 1; i <= 7; i++) {
+          const fieldData = offlineReport.data[`additionalField${i}`];
+          if (fieldData && fieldData.label && fieldData.value) {
+            fields.push({
+              label: fieldData.label,
+              value: fieldData.value
+            });
+          }
         }
+        setAdditionalFields(fields);
         setAdditionalFields(fields);
 
         console.log('✅ Relatório offline carregado');
@@ -407,7 +407,7 @@ export default function DefectInspectionReportEditScreen() {
             return hasUri;
           })
           .map((p, i) => {
-            const filename = p.uri.split('/').pop() || `photo-${i}.jpg`;
+            const filename = `photo_page${p.pageNumber}_pos${p.position}.jpg`;
             console.log(`   ✅ Incluindo foto ${i}: ${filename}`);
             return {
               tempId: `photo-${i}`,
