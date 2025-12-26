@@ -84,7 +84,7 @@ export const useReports = () => {
         type: photo.type || 'image/jpeg',
         name: photo.filename,
       });
-      formData.append('fieldName', 'photoOne');  // ← ADICIONAR ISTO
+      formData.append('fieldName', 'photoOne');
       formData.append('description', photo.filename || '');
       // Upload
       await reportsAPI.uploadPhoto(reportId, formData);
