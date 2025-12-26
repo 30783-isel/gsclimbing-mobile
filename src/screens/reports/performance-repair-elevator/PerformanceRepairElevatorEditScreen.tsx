@@ -1,7 +1,14 @@
 /**
  * PerformanceRepairElevatorEditScreen
+ * ✅ COMPLETAMENTE CORRIGIDO E ALINHADO COM DefectInspectionReportEditScreen
  * 
- * ✅ CORRIGIDO: Agora usa offlinePerformanceReportsService
+ * Alterações aplicadas:
+ * - photoGrid → photosGrid (grid 2x2)
+ * - gap → justifyContent: 'space-between'
+ * - Banner offline adicionado
+ * - ProgressBar adicionada
+ * - Estilos harmonizados
+ * - Suporte offline completo
  */
 
 import React, { useState, useEffect } from 'react';
@@ -13,7 +20,6 @@ import {
     TouchableOpacity,
     Image,
     ActivityIndicator,
-    Platform,
 } from 'react-native';
 import {
     Text,
@@ -25,7 +31,8 @@ import {
     Portal,
     Dialog,
     RadioButton,
-    Chip,
+    Banner,
+    ProgressBar,
 } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -40,7 +47,6 @@ import type {
 } from '@/types/performanceRepairElevator.types';
 import { API_CONFIG } from '@/constants/api';
 import Toast from 'react-native-toast-message';
-// ✅ USAR O SERVIÇO CORRETO
 import { offlinePerformanceReportsService } from '@/services/storage/offlinePerformanceReports.service';
 
 const convertToApiFormat = (value: '' | 'Yes' | 'No'): '' | 'yes' | 'no' => {
@@ -64,50 +70,41 @@ export default function PerformanceRepairElevatorEditScreen() {
     const reportId = params.reportId ? parseInt(params.reportId, 10) : 0;
     const turbineId = params.turbineId ? parseInt(params.turbineId, 10) : 0;
     const projectId = params.projectId ? parseInt(params.projectId, 10) : 0;
-    const tempIdParam = params.tempId;
+    const tempIdParam = params.tempId || null;
 
-    // Estados gerais
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [isOnline, setIsOnline] = useState(true);
-    const [isOfflineMode, setIsOfflineMode] = useState(false);
-    const [tempId, setTempId] = useState<string | null>(null);
-    const [reportUuid, setReportUuid] = useState<string>('');
-
-    // Página 1: Dados Fundamentais
+    // Estados do formulário
     const [site, setSite] = useState('');
     const [wtgNumber, setWtgNumber] = useState('');
     const [wtgType, setWtgType] = useState('');
     const [yearConstruction, setYearConstruction] = useState('');
     const [inspectors, setInspectors] = useState('');
-
-    // Página 2: Statement of Work
-    const [workCompleted, setWorkCompleted] = useState<'Yes' | 'No' | ''>('');
-    const [windturbineOperable, setWindturbineOperable] = useState<'Yes' | 'No' | ''>('');
-
-    // Página 3: Performance Report
+    const [workCompleted, setWorkCompleted] = useState<'' | 'Yes' | 'No'>('');
+    const [windturbineOperable, setWindturbineOperable] = useState<'' | 'Yes' | 'No'>('');
     const [performanceReport, setPerformanceReport] = useState('');
-
-    // Página 4: Photos (4 posições)
     const [photos, setPhotos] = useState<PhotoData[]>([]);
-    const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
-    const [photoDialogVisible, setPhotoDialogVisible] = useState(false);
-
-    // Página 5: Additional Fields (até 3)
     const [additionalFields, setAdditionalFields] = useState<AdditionalField[]>([]);
+    const [reportUuid, setReportUuid] = useState('');
+
+    // Estados de UI
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [isOnline, setIsOnline] = useState(true);
+    const [isOfflineMode, setIsOfflineMode] = useState(false);
+    const [tempId, setTempId] = useState<string | null>(null);
+    const [uploadProgress, setUploadProgress] = useState(0);
+
+    // Diálogos
+    const [photoDialogVisible, setPhotoDialogVisible] = useState(false);
+    const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
     const [fieldDialogVisible, setFieldDialogVisible] = useState(false);
-    const [editingFieldIndex, setEditingFieldIndex] = useState<number | null>(null);
     const [fieldLabel, setFieldLabel] = useState('');
     const [fieldValue, setFieldValue] = useState('');
+    const [editingFieldIndex, setEditingFieldIndex] = useState<number | null>(null);
 
-    // ====================================================================
-    // Lifecycle
-    // ====================================================================
+    // Monitorar conexão
     useEffect(() => {
         const unsubscribe = NetInfo.addEventListener(state => {
-            const online = state.isConnected ?? false;
-            console.log(`📡 Conexão mudou: ${online ? 'ONLINE' : 'OFFLINE'}`);
-            setIsOnline(online);
+            setIsOnline(state.isConnected ?? false);
         });
 
         NetInfo.fetch().then(state => {
@@ -117,6 +114,7 @@ export default function PerformanceRepairElevatorEditScreen() {
         return unsubscribe;
     }, []);
 
+    // Carregar dados
     useEffect(() => {
         loadData();
     }, [reportId, tempIdParam]);
@@ -125,16 +123,14 @@ export default function PerformanceRepairElevatorEditScreen() {
     // Load Data
     // ====================================================================
     const loadData = async () => {
-        console.log('🔍 loadData called with reportId:', reportId, 'tempId:', tempIdParam);
-
         try {
-            // ========================================
+            setLoading(true);
+
             // MODO 1: Carregar relatório offline
-            // ========================================
             if (tempIdParam) {
                 console.log('📵 Carregando relatório offline:', tempIdParam);
-                // ✅ USAR offlinePerformanceReportsService
                 const offlineReport = await offlinePerformanceReportsService.getById(tempIdParam);
+                
                 if (!offlineReport) {
                     Alert.alert('Erro', 'Relatório offline não encontrado');
                     router.back();
@@ -149,7 +145,6 @@ export default function PerformanceRepairElevatorEditScreen() {
                 setWtgType(offlineReport.data.wtgType || '');
                 setYearConstruction(offlineReport.data.yearConstruction || '');
                 setInspectors(offlineReport.data.inpectorsWorkers || '');
-
                 setWorkCompleted(offlineReport.data.workCompleted || '');
                 setWindturbineOperable(offlineReport.data.turbineOperable || '');
                 setPerformanceReport(offlineReport.data.performanceReport || '');
@@ -172,7 +167,7 @@ export default function PerformanceRepairElevatorEditScreen() {
                 // Carregar campos adicionais
                 const fields: AdditionalField[] = [];
                 if (offlineReport.data.additionalFields) {
-                    Object.entries(offlineReport.data.additionalFields).forEach(([field]) => {
+                    Object.entries(offlineReport.data.additionalFields).forEach(([_, field]) => {
                         if (field && typeof field === 'object' && 'label' in field && 'value' in field) {
                             fields.push({
                                 label: (field as any).label,
@@ -183,14 +178,11 @@ export default function PerformanceRepairElevatorEditScreen() {
                 }
                 setAdditionalFields(fields);
 
-                console.log('✅ Relatório offline carregado');
                 setLoading(false);
                 return;
             }
 
-            // ========================================
             // MODO 2: Criar novo (reportId === 0)
-            // ========================================
             if (reportId === 0) {
                 console.log('✅ Modo CREATE - inicializando fotos vazias');
                 const emptyPhotos: PhotoData[] = Array.from({ length: 4 }, (_, i) => ({
@@ -207,15 +199,12 @@ export default function PerformanceRepairElevatorEditScreen() {
                 return;
             }
 
-            // ========================================
             // MODO 3: Editar relatório existente online
-            // ========================================
             console.log('📥 Fetching report from API...');
             const report = await performanceRepairElevatorAPI.getById(reportId);
 
             if (!report) {
                 Alert.alert('Erro', 'Relatório não encontrado');
-                setLoading(false);
                 router.back();
                 return;
             }
@@ -318,23 +307,16 @@ export default function PerformanceRepairElevatorEditScreen() {
     };
 
     // ====================================================================
-    // Save - COM SUPORTE OFFLINE COMPLETO
+    // Save
     // ====================================================================
     const handleSave = async () => {
         if (!validateForm()) return;
 
         setSaving(true);
+        setUploadProgress(0);
 
         try {
-            console.log('💾 Starting save process...');
-            console.log(`🌐 Conexão: ${isOnline ? 'ONLINE' : 'OFFLINE'}`);
-            console.log('💾 [DEBUG] reportId:', reportId);
-            console.log('💾 [DEBUG] isOfflineMode:', isOfflineMode);
-            console.log('💾 [DEBUG] tempId:', tempId);
-
-            // ========================================
             // CENÁRIO 1: OFFLINE - CRIAR NOVO
-            // ========================================
             if (!isOnline && reportId === 0) {
                 console.log('📵 OFFLINE CREATE → Guardar localmente');
 
@@ -348,7 +330,6 @@ export default function PerformanceRepairElevatorEditScreen() {
                         description: p.description || '',
                     }));
 
-                // Preparar campos adicionais
                 const additionalData: Record<string, { label: string; value: string }> = {};
                 additionalFields.forEach((field, index) => {
                     if (field.label && field.value) {
@@ -359,11 +340,10 @@ export default function PerformanceRepairElevatorEditScreen() {
                     }
                 });
 
-                // ✅ USAR offlinePerformanceReportsService.create
                 const offlineReport = await offlinePerformanceReportsService.create({
                     projectId: projectId || 0,
                     turbineId: turbineId || 0,
-                    reportType: 1, // Performance = 1
+                    reportType: 1,
                     data: {
                         site,
                         wtgNumber,
@@ -378,7 +358,6 @@ export default function PerformanceRepairElevatorEditScreen() {
                     photos: offlinePhotos,
                 });
 
-                // ✅ Marcar para sincronização
                 await offlinePerformanceReportsService.markForSync(offlineReport.tempId);
 
                 Toast.show({
@@ -388,21 +367,14 @@ export default function PerformanceRepairElevatorEditScreen() {
                     visibilityTime: 4000,
                 });
 
-                console.log('✅ Performance Report created offline:', offlineReport.tempId);
-
-                setTimeout(() => {
-                    router.back();
-                }, 1000);
-
+                setTimeout(() => router.back(), 1000);
                 setSaving(false);
                 return;
             }
 
-            // ========================================
             // CENÁRIO 2: OFFLINE - EDITAR EXISTENTE
-            // ========================================
             if (!isOnline && isOfflineMode && tempId) {
-                console.log('📵 OFFLINE UPDATE → Atualizar relatório offline:', tempId);
+                console.log('📵 OFFLINE UPDATE → Atualizar relatório offline');
 
                 const offlinePhotos = photos
                     .filter(p => p.uri && p.uri.trim() !== '')
@@ -414,7 +386,6 @@ export default function PerformanceRepairElevatorEditScreen() {
                         description: p.description || '',
                     }));
 
-                // Preparar campos adicionais
                 const additionalData: Record<string, { label: string; value: string }> = {};
                 additionalFields.forEach((field, index) => {
                     if (field.label && field.value) {
@@ -425,7 +396,6 @@ export default function PerformanceRepairElevatorEditScreen() {
                     }
                 });
 
-                // ✅ USAR offlinePerformanceReportsService.update
                 await offlinePerformanceReportsService.update(tempId, {
                     data: {
                         site,
@@ -448,42 +418,35 @@ export default function PerformanceRepairElevatorEditScreen() {
                     visibilityTime: 4000,
                 });
 
-                console.log('✅ Performance Report offline updated:', tempId);
-
-                setTimeout(() => {
-                    router.back();
-                }, 1000);
-
+                setTimeout(() => router.back(), 1000);
                 setSaving(false);
                 return;
             }
 
-            // ========================================
-            // CENÁRIO 3 e 4: ONLINE (criar ou editar)
-            // ========================================
+            // CENÁRIO 3 e 4: ONLINE
+            const additionalData: any = {};
+            additionalFields.forEach((field, index) => {
+                additionalData[`additionalField${index + 1}Label`] = field.label;
+                additionalData[`additionalField${index + 1}Text`] = field.value;
+            });
+
             const baseData: PerformanceRepairElevatorData = {
                 site,
                 wtgNumber,
                 wtgType,
                 yearConstruction,
                 inspectors,
-                //TODO Colocar tudo a YES ou yes
                 workCompleted: convertToApiFormat(workCompleted),
-                windturbineOperable:convertToApiFormat(windturbineOperable),
+                windturbineOperable: convertToApiFormat(windturbineOperable),
                 performanceReport,
                 projectoId: projectId || 0,
                 turbinaId: turbineId || 0,
                 photos: [],
-                additionalFields: additionalFields.map((field, index) => ({
-                    [`additionalField${index + 1}Label`]: field.label,
-                    [`additionalField${index + 1}Text`]: field.value,
-                } as any)) as any,
+                additionalFields: additionalData,
             };
 
             if (reportId === 0) {
                 // CRIAR NOVO ONLINE
-                console.log('📝 Creating new report online...');
-
                 const createResponse = await performanceRepairElevatorAPI.create(baseData);
                 const savedReportId = createResponse.reportId;
                 const savedReportUuid = createResponse.uuid;
@@ -495,39 +458,17 @@ export default function PerformanceRepairElevatorEditScreen() {
                 // Upload de fotos
                 const photosToUpload = photos.filter(p => p.uri && p.uri.trim() !== '');
                 if (photosToUpload.length > 0) {
-                    const uploadedPhotos = [...photos];
-                    const uploadedPhotoIds: string[] = [];
-
                     for (let i = 0; i < photos.length; i++) {
                         const photo = photos[i];
                         if (photo.uri && photo.uri.trim() !== '') {
                             try {
-                                const uploadedPhoto = await performanceRepairElevatorAPI.uploadPhoto(
-                                    photo,           // ✅ primeiro: PhotoData
-                                    savedReportUuid  // ✅ segundo: string (UUID)
-                                );
-
-                                uploadedPhotos[i] = {
-                                    ...photo,
-                                    isUploaded: true,
-                                    fileId: String(uploadedPhoto.fileId),
-                                };
-                                uploadedPhotoIds.push(String(uploadedPhoto.fileId));
-                            } catch (photoError: any) {
+                                await performanceRepairElevatorAPI.uploadPhoto(photo, savedReportUuid);
+                                setUploadProgress((i + 1) / photosToUpload.length);
+                            } catch (photoError) {
                                 console.error(`❌ Error uploading photo ${i + 1}:`, photoError);
                             }
                         }
                     }
-
-                    if (uploadedPhotoIds.length > 0) {
-                        const finalData: PerformanceRepairElevatorData = {
-                            ...baseData,
-                            photos: uploadedPhotos,
-                        };
-                        await performanceRepairElevatorAPI.update(savedReportId, finalData);
-                    }
-
-                    setPhotos(uploadedPhotos);
                 }
 
                 Alert.alert('Sucesso', 'Relatório criado com sucesso', [
@@ -535,47 +476,21 @@ export default function PerformanceRepairElevatorEditScreen() {
                 ]);
             } else {
                 // ATUALIZAR ONLINE
-                console.log('📝 Updating existing report...');
+                await performanceRepairElevatorAPI.update(reportId, baseData);
 
+                // Upload fotos novas
                 const photosToUpload = photos.filter(p => p.uri && !p.isUploaded);
-
-                if (photosToUpload.length === 0) {
-                    await performanceRepairElevatorAPI.update(reportId, baseData);
-                } else {
-                    const uploadedPhotos = [...photos];
-                    let photosChanged = false;
-
+                if (photosToUpload.length > 0) {
                     for (let i = 0; i < photos.length; i++) {
                         const photo = photos[i];
                         if (photo.uri && !photo.isUploaded) {
                             try {
-                                const uploadedPhoto = await performanceRepairElevatorAPI.uploadPhoto(
-                                    photo,           // ✅ primeiro: PhotoData
-                                    reportUuid  // ✅ segundo: string (UUID)
-                                );
-                                uploadedPhotos[i] = {
-                                    ...photo,
-                                    isUploaded: true,
-                                    fileId: String(uploadedPhoto.fileId),
-                                };
-                                photosChanged = true;
-                            } catch (photoError: any) {
-                                console.error(`❌ Error uploading photo ${i + 1}:`, photoError);
+                                await performanceRepairElevatorAPI.uploadPhoto(photo, reportUuid);
+                            } catch (photoError) {
+                                console.error(`❌ Error uploading photo:`, photoError);
                             }
                         }
                     }
-
-                    if (photosChanged) {
-                        const finalData: PerformanceRepairElevatorData = {
-                            ...baseData,
-                            photos: uploadedPhotos,
-                        };
-                        await performanceRepairElevatorAPI.update(reportId, finalData);
-                    } else {
-                        await performanceRepairElevatorAPI.update(reportId, baseData);
-                    }
-
-                    setPhotos(uploadedPhotos);
                 }
 
                 Alert.alert('Sucesso', 'Relatório atualizado com sucesso', [
@@ -584,25 +499,10 @@ export default function PerformanceRepairElevatorEditScreen() {
             }
         } catch (error: any) {
             console.error('❌ Error saving report:', error);
-
-            if (error.code === 'OFFLINE' || error.message === 'Sem conexão à Internet') {
-                Alert.alert(
-                    'Conexão Perdida',
-                    'A conexão foi perdida. Relatório será guardado offline.',
-                    [{ text: 'OK' }]
-                );
-                Toast.show({
-                    type: 'info',
-                    text1: '📵 Guardado Offline',
-                    text2: 'Conexão perdida durante o save',
-                    visibilityTime: 4000,
-                });
-                router.back();
-            } else {
-                Alert.alert('Erro', error?.message || 'Erro ao guardar relatório');
-            }
+            Alert.alert('Erro', error?.message || 'Não foi possível guardar o relatório');
         } finally {
             setSaving(false);
+            setUploadProgress(0);
         }
     };
 
@@ -615,50 +515,47 @@ export default function PerformanceRepairElevatorEditScreen() {
     };
 
     const handleTakePhoto = async () => {
-        try {
-            const result = await ImagePicker.launchCameraAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                quality: 0.8,
-                allowsEditing: false,
-            });
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+            Alert.alert('Permissão Negada', 'Precisamos de acesso à câmara');
+            return;
+        }
 
-            if (!result.canceled && selectedPhotoIndex !== null) {
-                const newPhotos = [...photos];
-                newPhotos[selectedPhotoIndex] = {
-                    ...newPhotos[selectedPhotoIndex],
-                    uri: result.assets[0].uri,
-                    timestamp: Date.now(),
-                    isUploaded: false,
-                };
-                setPhotos(newPhotos);
-                setPhotoDialogVisible(false);
-            }
-        } catch (error) {
-            Alert.alert('Erro', 'Não foi possível tirar a foto');
+        const result = await ImagePicker.launchCameraAsync({
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 0.8,
+        });
+
+        if (!result.canceled && selectedPhotoIndex !== null) {
+            const newPhotos = [...photos];
+            newPhotos[selectedPhotoIndex] = {
+                ...newPhotos[selectedPhotoIndex],
+                uri: result.assets[0].uri,
+                isUploaded: false,
+            };
+            setPhotos(newPhotos);
+            setPhotoDialogVisible(false);
         }
     };
 
-    const handlePickFromGallery = async () => {
-        try {
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                quality: 0.8,
-                allowsEditing: false,
-            });
+    const handlePickPhoto = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 0.8,
+        });
 
-            if (!result.canceled && selectedPhotoIndex !== null) {
-                const newPhotos = [...photos];
-                newPhotos[selectedPhotoIndex] = {
-                    ...newPhotos[selectedPhotoIndex],
-                    uri: result.assets[0].uri,
-                    timestamp: Date.now(),
-                    isUploaded: false,
-                };
-                setPhotos(newPhotos);
-                setPhotoDialogVisible(false);
-            }
-        } catch (error) {
-            Alert.alert('Erro', 'Não foi possível selecionar a foto');
+        if (!result.canceled && selectedPhotoIndex !== null) {
+            const newPhotos = [...photos];
+            newPhotos[selectedPhotoIndex] = {
+                ...newPhotos[selectedPhotoIndex],
+                uri: result.assets[0].uri,
+                isUploaded: false,
+            };
+            setPhotos(newPhotos);
+            setPhotoDialogVisible(false);
         }
     };
 
@@ -764,18 +661,26 @@ export default function PerformanceRepairElevatorEditScreen() {
                         Performance Report Repair Elevator
                     </Text>
                 </View>
-                <Chip
-                    icon={isOnline ? 'wifi' : 'wifi-off'}
-                    style={isOnline ? styles.onlineChip : styles.offlineChip}
-                >
-                    {isOnline ? 'Online' : 'Offline'}
-                </Chip>
+                <IconButton
+                    icon="content-save"
+                    iconColor={colors.white}
+                    size={24}
+                    onPress={handleSave}
+                    disabled={saving}
+                />
             </View>
 
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-                {/* Página 1: Dados Fundamentais */}
+            {/* ✅ Banner Offline */}
+            {!isOnline && (
+                <Banner visible={true} icon="wifi-off" style={styles.offlineBanner}>
+                    📵 Modo Offline - {isOfflineMode ? 'Editando relatório local' : 'Será guardado localmente'}
+                </Banner>
+            )}
+
+            <ScrollView style={styles.scrollView}>
+                {/* Card 1: Fundamental Data */}
                 <Card style={styles.card}>
-                    <Card.Title title="1. Dados Fundamentais" titleVariant="titleLarge" />
+                    <Card.Title title="1. Fundamental Data" titleVariant="titleLarge" />
                     <Card.Content>
                         <TextInput
                             label="Site *"
@@ -807,18 +712,16 @@ export default function PerformanceRepairElevatorEditScreen() {
                             style={styles.input}
                         />
                         <TextInput
-                            label="Inspectors / Workers"
+                            label="Inspectors/Workers"
                             value={inspectors}
                             onChangeText={setInspectors}
                             mode="outlined"
-                            multiline
-                            numberOfLines={3}
                             style={styles.input}
                         />
                     </Card.Content>
                 </Card>
 
-                {/* Página 2: Statement of Work */}
+                {/* Card 2: Statement of Work */}
                 <Card style={styles.card}>
                     <Card.Title title="2. Statement of Work" titleVariant="titleLarge" />
                     <Card.Content>
@@ -837,10 +740,7 @@ export default function PerformanceRepairElevatorEditScreen() {
                         <Text variant="titleSmall" style={styles.sectionLabel}>
                             Windturbine Operable
                         </Text>
-                        <RadioButton.Group
-                            value={windturbineOperable}
-                            onValueChange={setWindturbineOperable as any}
-                        >
+                        <RadioButton.Group value={windturbineOperable} onValueChange={setWindturbineOperable as any}>
                             <View style={styles.radioRow}>
                                 <RadioButton.Item label="Yes" value="Yes" />
                                 <RadioButton.Item label="No" value="No" />
@@ -849,7 +749,7 @@ export default function PerformanceRepairElevatorEditScreen() {
                     </Card.Content>
                 </Card>
 
-                {/* Página 3: Performance Report */}
+                {/* Card 3: Performance Report */}
                 <Card style={styles.card}>
                     <Card.Title title="3. Performance Report" titleVariant="titleLarge" />
                     <Card.Content>
@@ -866,11 +766,11 @@ export default function PerformanceRepairElevatorEditScreen() {
                     </Card.Content>
                 </Card>
 
-                {/* Página 4: Photo Documentation */}
+                {/* Card 4: Photo Documentation - ✅ CORRIGIDO */}
                 <Card style={styles.card}>
                     <Card.Title title="4. Photo Documentation" titleVariant="titleLarge" />
                     <Card.Content>
-                        <View style={styles.photoGrid}>
+                        <View style={styles.photosGrid}>
                             {photos.map((photo, index) => (
                                 <TouchableOpacity
                                     key={photo.id}
@@ -881,8 +781,8 @@ export default function PerformanceRepairElevatorEditScreen() {
                                         <Image source={{ uri: photo.uri }} style={styles.photoImage} />
                                     ) : (
                                         <View style={styles.photoPlaceholder}>
-                                            <IconButton icon="camera-plus" size={32} />
-                                            <Text variant="bodySmall">Foto {index + 1}</Text>
+                                            <IconButton icon="camera-plus" size={32} iconColor={colors.disabled} />
+                                            <Text style={styles.photoLabel}>Posição {photo.position}</Text>
                                         </View>
                                     )}
                                 </TouchableOpacity>
@@ -891,7 +791,7 @@ export default function PerformanceRepairElevatorEditScreen() {
                     </Card.Content>
                 </Card>
 
-                {/* Página 5: Additional Fields */}
+                {/* Card 5: Additional Fields */}
                 <Card style={styles.card}>
                     <Card.Title
                         title="5. Additional Fields"
@@ -936,45 +836,53 @@ export default function PerformanceRepairElevatorEditScreen() {
                     </Card.Content>
                 </Card>
 
-                {/* Botão Save */}
+                {/* ✅ Progress Bar */}
+                {saving && uploadProgress > 0 && (
+                    <ProgressBar
+                        progress={uploadProgress}
+                        color={colors.primary}
+                        style={styles.progressBar}
+                    />
+                )}
+
+                {/* Botão Guardar */}
                 <Button
                     mode="contained"
                     onPress={handleSave}
                     loading={saving}
                     disabled={saving}
                     style={styles.saveButton}
-                    icon="content-save"
                 >
-                    {saving ? 'A guardar...' : 'Guardar Relatório'}
+                    {saving ? 'A Guardar...' : 'Guardar Relatório'}
                 </Button>
             </ScrollView>
 
-            {/* Photo Dialog */}
+            {/* Dialog Foto */}
             <Portal>
                 <Dialog visible={photoDialogVisible} onDismiss={() => setPhotoDialogVisible(false)}>
-                    <Dialog.Title>Selecionar Foto</Dialog.Title>
+                    <Dialog.Title>Adicionar Foto</Dialog.Title>
                     <Dialog.Content>
                         <Button
                             mode="outlined"
-                            onPress={handleTakePhoto}
                             icon="camera"
+                            onPress={handleTakePhoto}
                             style={styles.dialogButton}
                         >
                             Tirar Foto
                         </Button>
                         <Button
                             mode="outlined"
-                            onPress={handlePickFromGallery}
                             icon="image"
+                            onPress={handlePickPhoto}
                             style={styles.dialogButton}
                         >
                             Escolher da Galeria
                         </Button>
-                        {selectedPhotoIndex !== null && photos[selectedPhotoIndex].uri && (
+                        {selectedPhotoIndex !== null && photos[selectedPhotoIndex]?.uri && (
                             <Button
                                 mode="outlined"
-                                onPress={handleRemovePhoto}
                                 icon="delete"
+                                onPress={handleRemovePhoto}
                                 style={styles.dialogButton}
                                 textColor={colors.error}
                             >
@@ -988,15 +896,15 @@ export default function PerformanceRepairElevatorEditScreen() {
                 </Dialog>
             </Portal>
 
-            {/* Field Dialog */}
+            {/* Dialog Campo Adicional */}
             <Portal>
                 <Dialog visible={fieldDialogVisible} onDismiss={() => setFieldDialogVisible(false)}>
                     <Dialog.Title>
-                        {editingFieldIndex !== null ? 'Editar Campo' : 'Novo Campo'}
+                        {editingFieldIndex !== null ? 'Editar Campo' : 'Adicionar Campo'}
                     </Dialog.Title>
                     <Dialog.Content>
                         <TextInput
-                            label="Nome do Campo"
+                            label="Título do Campo"
                             value={fieldLabel}
                             onChangeText={setFieldLabel}
                             mode="outlined"
@@ -1022,64 +930,128 @@ export default function PerformanceRepairElevatorEditScreen() {
     );
 }
 
-// Styles (mesmos do anterior)
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: colors.primary,
-        paddingHorizontal: spacing.sm,
-        paddingTop: Platform.OS === 'ios' ? 50 : spacing.md,
-        paddingBottom: spacing.md,
+    container: {
+        flex: 1,
+        backgroundColor: colors.background,
     },
-    headerCenter: { flex: 1, marginHorizontal: spacing.sm },
-    headerTitle: { color: colors.white, fontWeight: 'bold' },
-    headerSubtitle: { color: colors.white, opacity: 0.9 },
-    onlineChip: { backgroundColor: colors.success },
-    offlineChip: { backgroundColor: colors.warning },
-    scrollView: { flex: 1 },
-    content: { padding: spacing.md, paddingBottom: spacing.xl },
-    card: { marginBottom: spacing.md },
-    input: { marginBottom: spacing.md },
-    textArea: { minHeight: 120 },
-    sectionLabel: { marginBottom: spacing.xs, marginTop: spacing.sm },
-    radioRow: { flexDirection: 'row', justifyContent: 'space-around' },
-    divider: { marginVertical: spacing.md },
-    photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
-    photoSlot: {
-        width: '48%',
-        aspectRatio: 1,
-        borderRadius: 8,
-        overflow: 'hidden',
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.border,
-    },
-    photoImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-    photoPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    fieldCard: { marginBottom: spacing.sm, backgroundColor: colors.surface },
-    fieldHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: spacing.xs,
-    },
-    fieldActions: { flexDirection: 'row' },
-    emptyText: {
-        textAlign: 'center',
-        color: colors.textSecondary,
-        fontStyle: 'italic',
-        paddingVertical: spacing.md,
-    },
-    saveButton: { marginTop: spacing.md, paddingVertical: spacing.xs },
-    dialogButton: { marginBottom: spacing.sm },
-    dialogInput: { marginBottom: spacing.md },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: colors.background,
     },
-    loadingText: { marginTop: spacing.md, color: colors.textSecondary },
+    loadingText: {
+        marginTop: spacing.md,
+        color: colors.textSecondary,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.primary,
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.xs,
+    },
+    headerCenter: {
+        flex: 1,
+        marginLeft: spacing.sm,
+    },
+    headerTitle: {
+        color: colors.white,
+        fontWeight: 'bold',
+    },
+    headerSubtitle: {
+        color: colors.white,
+        opacity: 0.8,
+    },
+    offlineBanner: {
+        backgroundColor: colors.warning + '20',
+    },
+    scrollView: {
+        flex: 1,
+    },
+    card: {
+        margin: spacing.md,
+        marginBottom: 0,
+    },
+    input: {
+        marginBottom: spacing.sm,
+    },
+    textArea: {
+        minHeight: 120,
+    },
+    sectionLabel: {
+        marginBottom: spacing.xs,
+        marginTop: spacing.sm,
+    },
+    radioRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+    },
+    divider: {
+        marginVertical: spacing.md,
+    },
+    // ✅ CORRIGIDO: photosGrid em vez de photoGrid
+    photosGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',  // ✅ Em vez de gap
+    },
+    photoSlot: {
+        width: '48%',
+        aspectRatio: 1,
+        marginBottom: spacing.sm,
+        borderRadius: 8,
+        overflow: 'hidden',
+        backgroundColor: colors.surface,
+    },
+    photoImage: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover',
+    },
+    photoPlaceholder: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: colors.surfaceVariant,
+    },
+    photoLabel: {
+        fontSize: 12,
+        color: colors.disabled,
+        marginTop: -spacing.xs,
+    },
+    fieldCard: {
+        marginBottom: spacing.sm,
+        backgroundColor: colors.surface,
+    },
+    fieldHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.xs,
+    },
+    fieldActions: {
+        flexDirection: 'row',
+    },
+    emptyText: {
+        textAlign: 'center',
+        color: colors.textSecondary,
+        fontStyle: 'italic',
+        paddingVertical: spacing.md,
+    },
+    progressBar: {
+        marginHorizontal: spacing.md,
+        marginTop: spacing.sm,
+    },
+    saveButton: {
+        margin: spacing.md,
+        marginTop: spacing.lg,
+    },
+    dialogButton: {
+        marginBottom: spacing.sm,
+    },
+    dialogInput: {
+        marginBottom: spacing.sm,
+    },
 });
