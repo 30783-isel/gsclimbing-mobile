@@ -424,10 +424,14 @@ export default function PerformanceRepairElevatorEditScreen() {
             }
 
             // CENÁRIO 3 e 4: ONLINE
-            const additionalData: any = {};
+            const additionalData: Record<string, { label: string; value: string }> = {};
             additionalFields.forEach((field, index) => {
-                additionalData[`additionalField${index + 1}Label`] = field.label;
-                additionalData[`additionalField${index + 1}Text`] = field.value;
+                if (field.label && field.value) {
+                    additionalData[`additionalField${index + 1}`] = {
+                        label: field.label,
+                        value: field.value,
+                    };
+                }
             });
 
             const baseData: PerformanceRepairElevatorData = {
@@ -442,7 +446,7 @@ export default function PerformanceRepairElevatorEditScreen() {
                 projectoId: projectId || 0,
                 turbinaId: turbineId || 0,
                 photos: [],
-                additionalFields: additionalData,
+                additionalFields: additionalFields,
             };
 
             if (reportId === 0) {
