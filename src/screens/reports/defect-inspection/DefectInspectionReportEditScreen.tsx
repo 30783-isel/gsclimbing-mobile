@@ -190,7 +190,7 @@ export default function DefectInspectionReportEditScreen() {
         // Carregar campos adicionais
         const fields: AdditionalField[] = [];
         if (offlineReport.data.additionalFields) {
-          Object.entries(offlineReport.data.additionalFields).forEach(([field]) => {
+          Object.entries(offlineReport.data.additionalFields).forEach(([_, field]) => {
             if (field && typeof field === 'object' && 'label' in field && 'value' in field) {
               fields.push({
                 label: (field as any).label,
