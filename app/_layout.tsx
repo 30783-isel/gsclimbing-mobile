@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/authStore';
 import { theme } from '@/constants/theme';
 import '@/i18n/config';
 import { reportSyncService } from '@/services/sync/reportSync.service';
+import { performanceReportSyncService } from '@/services/sync/performanceReportSync.service';
 
 export default function RootLayout() {
   const { initializeAuth, isAuthenticated, isLoading, role } = useAuthStore();
@@ -17,6 +18,7 @@ export default function RootLayout() {
   useEffect(() => {
     initializeAuth();
     reportSyncService.initialize();
+    performanceReportSyncService.initialize(); 
   }, []);
 
   useEffect(() => {

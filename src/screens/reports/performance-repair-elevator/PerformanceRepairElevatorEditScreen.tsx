@@ -328,6 +328,9 @@ export default function PerformanceRepairElevatorEditScreen() {
         try {
             console.log('💾 Starting save process...');
             console.log(`🌐 Conexão: ${isOnline ? 'ONLINE' : 'OFFLINE'}`);
+            console.log('💾 [DEBUG] reportId:', reportId);
+            console.log('💾 [DEBUG] isOfflineMode:', isOfflineMode);
+            console.log('💾 [DEBUG] tempId:', tempId);
 
             // ========================================
             // CENÁRIO 1: OFFLINE - CRIAR NOVO

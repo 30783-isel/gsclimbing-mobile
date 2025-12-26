@@ -193,7 +193,7 @@ class PerformanceReportSyncService {
   }
 
   /**
-   * Sincronizar um relatório Performance
+   * ✅ CORRIGIDO: Sincronizar um relatório Performance
    */
   async syncOne(report: OfflinePerformanceReport): Promise<PerformanceSyncResult> {
     try {
@@ -205,29 +205,42 @@ class PerformanceReportSyncService {
       this.log('info', `📋 WTG: ${reportData.wtgNumber}`);
       this.log('info', `📋 Fotos: ${report.photos?.length || 0}`);
 
-      // ✅ PASSO 1: Criar relatório via API
-      const createPayload = {
+      // ✅ CRIAR O OBJETO DE DADOS INTERNOS (para dentro de reportData JSON)
+      const innerData: any = {
         site: reportData.site,
         wtgNumber: reportData.wtgNumber,
         wtgType: reportData.wtgType,
         yearConstruction: reportData.yearConstruction,
         projectoId: report.projectId,
-        turbinaId: report.turbineId,
-        inpectorsWorkers: reportData.inpectorsWorkers || '',
+        inspectors: reportData.inpectorsWorkers || '',
         workCompleted: reportData.workCompleted || '',
-        turbineOperable: reportData.turbineOperable || '',
+        windturbineOperable: reportData.turbineOperable || '',
         performanceReport: reportData.performanceReport || '',
-        photoFileIds: [], // Vazio inicialmente
       };
 
       // Adicionar campos adicionais se existirem
       if (reportData.additionalFields) {
         Object.entries(reportData.additionalFields).forEach(([key, field]) => {
           const fieldNum = key.replace('additionalField', '');
-          (createPayload as any)[`additionalField${fieldNum}Label`] = field.label;
-          (createPayload as any)[`additionalField${fieldNum}Text`] = field.value;
+          innerData[`additionalField${fieldNum}`] = {
+            label: field.label,
+            value: field.value,
+          };
         });
       }
+
+      // ✅ CRIAR PAYLOAD NO FORMATO CORRETO
+      const createPayload = {
+        turbineId: report.turbineId,
+        projectoId: report.projectId,
+        reportType: 6,  // Performance Repair Elevator
+        reportData: JSON.stringify(innerData),  // ← STRING JSON!
+        photoIds: [],
+      };
+
+      this.log('info', `📤 Payload preparado:`);
+      console.log('🔍 INNER DATA:', JSON.stringify(innerData, null, 2));
+      console.log('🔍 CREATE PAYLOAD:', JSON.stringify(createPayload, null, 2));
 
       this.log('info', `📤 Criando relatório via /performance-repair-elevator...`);
 
@@ -283,7 +296,7 @@ class PerformanceReportSyncService {
             formData.append('description', photo.description || '');
 
             const uploadResponse = await httpClient.post(
-              `${API_CONFIG.baseMobileReportsUrl}performance-repair-elevator/${reportUuid}/upload-photo`,
+              `${API_CONFIG.baseFilesUrl}upload/${reportUuid}`,
               formData,
               {
                 headers: {
@@ -307,12 +320,23 @@ class PerformanceReportSyncService {
         this.log('info', `🔄 Updating report com ${uploadedPhotoIds.length} foto IDs...`);
 
         try {
+          // Adicionar photoIds ao innerData
+          const updatedInnerData = {
+            ...innerData,
+            photoFileIds: uploadedPhotoIds,
+          };
+
+          const updatePayload = {
+            turbineId: report.turbineId,
+            projectoId: report.projectId,
+            reportType: 6,
+            reportData: JSON.stringify(updatedInnerData),
+            photoIds: uploadedPhotoIds,
+          };
+
           await httpClient.put(
             `${API_CONFIG.baseMobileReportsUrl}performance-repair-elevator/${reportId}`,
-            {
-              ...createPayload,
-              photoFileIds: uploadedPhotoIds,
-            }
+            updatePayload
           );
           this.log('success', '✅ Relatório atualizado com fotos');
         } catch (updateError: any) {
