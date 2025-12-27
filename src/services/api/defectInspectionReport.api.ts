@@ -17,20 +17,62 @@ export interface ReportPhotoData {
 }
 
 export const defectInspectionReportAPI = {
-  /**
-   * Criar novo relatório
-   */
-  create: async (
-    data: DefectInspectionReportDTO
-  ): Promise<DefectInspectionReportResponse> => {
-    // ✅ ANTES: ${API_CONFIG.baseUrl}reports/mobile/defect-inspection
-    // ✅ DEPOIS: ${API_CONFIG.baseMobileReportsUrl}defect-inspection
+/**
+ * Criar novo relatório
+ */
+create: async (
+  data: DefectInspectionReportDTO
+): Promise<DefectInspectionReportResponse> => {
+  try {
+    console.log('📝 Creating Defect Inspection Report...');
+    console.log('📋 Original data:', JSON.stringify(data, null, 2));
+
+    // ✅ CONVERTER para o formato que o backend espera
+    const payload = {
+      turbineId: data.turbinaId, // ← Corrigido: só turbinaId
+      reportType: 0, // Defect Inspection = 0
+      language: 'EN',
+      reportData: JSON.stringify({
+        site: data.site,
+        wtgNumber: data.wtgNumber,
+        wtgType: data.wtgType,
+        yearConstruction: data.yearConstruction,
+        dateInspection: new Date().toISOString().split('T')[0],
+        inspectedBy: '',
+        observations: '',
+        // Campos adicionais
+        additionalField1Label: data.additionalField1?.label || '',
+        additionalField1Text: data.additionalField1?.value || '',
+        additionalField2Label: data.additionalField2?.label || '',
+        additionalField2Text: data.additionalField2?.value || '',
+        additionalField3Label: data.additionalField3?.label || '',
+        additionalField3Text: data.additionalField3?.value || '',
+        additionalField4Label: data.additionalField4?.label || '',
+        additionalField4Text: data.additionalField4?.value || '',
+        additionalField5Label: data.additionalField5?.label || '',
+        additionalField5Text: data.additionalField5?.value || '',
+        additionalField6Label: data.additionalField6?.label || '',
+        additionalField6Text: data.additionalField6?.value || '',
+        additionalField7Label: data.additionalField7?.label || '',
+        additionalField7Text: data.additionalField7?.value || '',
+      }),
+      photoFileIds: data.photoFileIds || [],
+    };
+
+    console.log('📤 Sending payload:', JSON.stringify(payload, null, 2));
+
     const response = await httpClient.post(
       `${API_CONFIG.baseMobileReportsUrl}defect-inspection`,
-      data
+      payload
     );
+
+    console.log('✅ Report created successfully:', response.data);
     return response.data;
-  },
+  } catch (error: any) {
+    console.error('❌ Error creating report:', error.response?.data || error.message);
+    throw error;
+  }
+},
 
   /**
    * Obter relatório por ID
