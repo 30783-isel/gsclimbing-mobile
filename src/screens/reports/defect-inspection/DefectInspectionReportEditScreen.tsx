@@ -253,20 +253,24 @@ export default function DefectInspectionReportEditScreen() {
         // Carregar fotos do servidor
         const existingPhotos = await defectInspectionReportAPI.getPhotos(reportId);
 
+        console.log('🔍 DEBUG: Fotos retornadas pela API:', existingPhotos);
+        console.log('🔍 DEBUG: Número de fotos:', existingPhotos?.length || 0);
+
         const initialPhotos: PhotoData[] = Array.from({ length: 8 }, (_, i) => {
           const pageNumber = i < 4 ? 2 : 3;
           const position = (i % 4) + 1;
-          const existingPhoto = existingPhotos[i];
+          const existingPhoto = existingPhotos?.[i];
 
-          if (existingPhoto) {
-            const baseUrlClean = API_CONFIG.baseUrl.replace('/api/', '');
-            const correctPath = existingPhoto.downloadUrl.replace(
-              '/api/reports/files/download/',
-              '/api/reports/mobile/files/download/'
-            );
-            const fullImageUrl = correctPath.startsWith('http')
-              ? correctPath
-              : `${baseUrlClean}${correctPath}`;
+          // Se existe foto nesta posição
+          if (existingPhoto && existingPhoto.hash) {
+            // Construir URL diretamente do hash (mais simples e robusto)
+            const fullImageUrl = `http://192.168.1.64:8080/api/reports/mobile/files/download/${existingPhoto.hash}`;
+
+            console.log(`📸 Foto ${i}:`, {
+              fileId: existingPhoto.fileId,
+              hash: existingPhoto.hash,
+              url: fullImageUrl
+            });
 
             return {
               id: `photo-${i}`,
@@ -280,6 +284,7 @@ export default function DefectInspectionReportEditScreen() {
             };
           }
 
+          // Posição vazia
           return {
             id: `photo-${i}`,
             uri: '',
@@ -432,7 +437,7 @@ export default function DefectInspectionReportEditScreen() {
             };
           }
         });
-        
+
         console.log('📋 Campos adicionais preparados:', JSON.stringify(additionalData, null, 2));
         console.log('📋 Número de campos:', Object.keys(additionalData).length);
 
