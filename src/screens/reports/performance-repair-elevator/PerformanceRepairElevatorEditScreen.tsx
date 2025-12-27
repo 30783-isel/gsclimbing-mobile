@@ -239,14 +239,8 @@ export default function PerformanceRepairElevatorEditScreen() {
                     const existingPhoto = existingPhotos?.[i];
 
                     if (existingPhoto) {
-                        const baseUrlClean = API_CONFIG.baseUrl.replace('/api/', '');
-                        const correctPath = existingPhoto.downloadUrl.replace(
-                            '/api/reports/files/download/',
-                            '/api/reports/mobile/files/download/'
-                        );
-                        const fullImageUrl = correctPath.startsWith('http')
-                            ? correctPath
-                            : `${baseUrlClean}${correctPath}`;
+                        // ✅ SOLUÇÃO SIMPLES E DIRETA
+                        const fullImageUrl = `http://192.168.1.64:8080/api/reports/mobile/files/download/${existingPhoto.hash}`;
 
                         return {
                             id: `photo-${i}`,
@@ -443,7 +437,7 @@ export default function PerformanceRepairElevatorEditScreen() {
 
             console.log('📋 Campos adicionais preparados:', JSON.stringify(additionalData, null, 2));
             console.log('📋 Número de campos:', Object.keys(additionalData).length);
-            
+
             const baseData: PerformanceRepairElevatorData = {
                 site,
                 wtgNumber,
