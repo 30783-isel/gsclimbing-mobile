@@ -240,7 +240,7 @@ export default function PerformanceRepairElevatorEditScreen() {
 
                     if (existingPhoto) {
                         // ✅ SOLUÇÃO SIMPLES E DIRETA
-                        const fullImageUrl = `http://192.168.1.64:8080/api/reports/files/download/${existingPhoto.hash}`;
+                        const fullImageUrl = `${API_CONFIG.baseFilesUrl}download/${existingPhoto.hash}`;
 
                         return {
                             id: `photo-${i}`,

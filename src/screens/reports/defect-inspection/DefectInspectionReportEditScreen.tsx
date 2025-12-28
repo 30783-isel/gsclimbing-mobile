@@ -264,7 +264,7 @@ export default function DefectInspectionReportEditScreen() {
           // Se existe foto nesta posição
           if (existingPhoto && existingPhoto.hash) {
             // Construir URL diretamente do hash (mais simples e robusto)
-            const fullImageUrl = `http://192.168.1.64:8080/api/reports/files/download/${existingPhoto.hash}`;
+            const fullImageUrl = `${API_CONFIG.baseFilesUrl}download/${existingPhoto.hash}`;
 
             console.log(`📸 Foto ${i}:`, {
               fileId: existingPhoto.fileId,
