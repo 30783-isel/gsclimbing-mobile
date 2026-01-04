@@ -27,7 +27,6 @@ export interface PhotoData {
   isUploaded: boolean;
   fileId?: string;
   description: string;
-  fileId?: string; // ID retornado pelo backend após upload
   replacedFileId?: string;
 }
 

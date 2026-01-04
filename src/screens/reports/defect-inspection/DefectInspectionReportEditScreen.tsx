@@ -38,13 +38,15 @@ import NetInfo from '@react-native-community/netinfo';
 import { colors, spacing } from '@/constants/theme';
 import { API_CONFIG } from '@/constants/api';
 import httpClient from '@/services/httpClient';
+
 import type {
   PhotoData,
-  AdditionalField,
+  AdditionalField
 } from '@/types/defectInspectionReport.types';
 import { defectInspectionReportAPI } from '@/services/api/defectInspectionReport.api';
 import { offlineReportsService, OfflinePhoto } from '@/services/storage/offlineReports.service';
 import { ReportType } from '@/types/report.types';
+import { Report } from '@/types/report.types';
 
 export default function DefectInspectionReportEditScreen() {
   const router = useRouter();
@@ -89,6 +91,9 @@ export default function DefectInspectionReportEditScreen() {
   const [fieldLabel, setFieldLabel] = useState('');
   const [fieldValue, setFieldValue] = useState('');
   const [editingFieldIndex, setEditingFieldIndex] = useState<number | null>(null);
+  const [report, setReport] = useState<Report | null>(null);
+
+
 
   // Monitorar conexão
   useEffect(() => {
@@ -297,8 +302,11 @@ export default function DefectInspectionReportEditScreen() {
         // Carregar campos adicionais
         const fields: AdditionalField[] = [];
         for (let i = 1; i <= 7; i++) {
+          console.log(i);
           const label = (report as any)[`additionalField${i}Label`];
+          console.log(label);
           const value = (report as any)[`additionalField${i}Text`];
+          console.log(value);
           if (label && value) {
             fields.push({ label, value });
           }
@@ -329,7 +337,6 @@ export default function DefectInspectionReportEditScreen() {
       setLoading(false);
     }
   };
-
 
   /**
    * CORREÇÃO DO BUG DE HISTÓRICO DE FOTOS
@@ -432,7 +439,7 @@ export default function DefectInspectionReportEditScreen() {
             };
           }
         });
-        
+
         console.log('📋 Campos adicionais preparados:', JSON.stringify(additionalData, null, 2));
         console.log('📋 Número de campos:', Object.keys(additionalData).length);
 
